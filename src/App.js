@@ -2,7 +2,7 @@
 // This AWS Content is provided subject to the terms of the AWS Customer Agreement available at
 // http://aws.amazon.com/agreement or other written agreement between Customer and either
 // Amazon Web Services, Inc. or Amazon Web Services EMEA SARL or both.
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Amplify, Auth, Hub } from "aws-amplify";
 import { Spin, Layout } from "antd";
 import awsconfig from "./aws-exports";
@@ -42,6 +42,28 @@ function App() {
   const [groupIds, setGroupIds] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  async function getUser() {
+    try {
+      const userData = await Auth.currentAuthenticatedUser();
+      return userData;
+    } catch {
+      setLoading(false);
+      return console.log("Not signed in");
+    }
+  }
+
+  const setData = useCallback(() => {
+    getUser().then((userData) => {
+      setUser(userData);
+      const payload = userData.signInUserSession.idToken.payload;
+      setcognitoGroups(payload["cognito:groups"]);
+      setUserId(payload.userId);
+      setGroupIds((payload.groupIds).split(','));
+      setGroups((payload.groups).split(','));
+      setLoading(false);
+    });
+  }, []);
+
   useEffect(() => {
     Hub.listen("auth", ({ payload: { event, data } }) => {
       // eslint-disable-next-line default-case
@@ -67,29 +89,7 @@ function App() {
     });
 
     setData();
-  }, []);
-
-  function setData() {
-    getUser().then((userData) => {
-      setUser(userData);
-      const payload = userData.signInUserSession.idToken.payload;
-      setcognitoGroups(payload["cognito:groups"]);
-      setUserId(payload.userId);
-      setGroupIds((payload.groupIds).split(','));
-      setGroups((payload.groups).split(','));
-      setLoading(false);
-    });
-  }
-
-  async function getUser() {
-    try {
-      const userData = await Auth.currentAuthenticatedUser();
-      return userData;
-    } catch {
-      setLoading(false);
-      return console.log("Not signed in");
-    }
-  }
+  }, [setData]);
 
   return (
     <div>

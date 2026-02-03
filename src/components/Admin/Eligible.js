@@ -287,7 +287,7 @@ function Eligible(props) {
 
   const { selectedItems } = collectionProps;
   const [confirmLoading, setConfirmLoading] = useState(false);
-  const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitLoading, setSubmitLoading] = useState(false); // eslint-disable-line no-unused-vars
   const [tableLoading, setTableLoading] = useState(true);
   const [visible, setVisible] = useState(false);
   const [deleteVisible, setDeleteVisible] = useState(false);
@@ -318,7 +318,7 @@ function Eligible(props) {
   const [groupStatus, setGroupStatus] = useState("finished");
 
   const [ous, setOUs] = useState([]);
-  const [ouStatus, setOUStatus] = useState("finished");
+  const [ouStatus, setOUStatus] = useState("finished"); // eslint-disable-line no-unused-vars
 
   const [permissions, setPermissions] = useState([]);
   const [permissionStatus, setPermissionStatus] = useState("finished");

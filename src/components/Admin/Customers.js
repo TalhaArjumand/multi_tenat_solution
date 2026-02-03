@@ -13,7 +13,6 @@ import {
   SpaceBetween,
   CollectionPreferences,
   Multiselect,
-  TextContent,
   Modal,
   FormField,
   Form,
@@ -22,8 +21,7 @@ import {
   Input,
   Spinner,
   Textarea,
-  StatusIndicator,
-  Container
+  StatusIndicator
 } from "@awsui/components-react";
 import { useCollection } from "@awsui/collection-hooks";
 import { API, graphqlOperation } from "aws-amplify";
@@ -149,7 +147,6 @@ function Customers(props) {
 
   const {
     items,
-    actions,
     filteredItemsCount,
     collectionProps,
     filterProps,

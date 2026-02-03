@@ -2,7 +2,7 @@
 // This AWS Content is provided subject to the terms of the AWS Customer Agreement available at
 // http://aws.amazon.com/agreement or other written agreement between Customer and either
 // Amazon Web Services, Inc. or Amazon Web Services EMEA SARL or both.
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Box from "@awsui/components-react/box";
 import SpaceBetween from "@awsui/components-react/space-between";
 import Container from "@awsui/components-react/container";
@@ -103,16 +103,16 @@ function Settings(props) {
   const baseSlackAppUrl = "https://api.slack.com/apps?new_app=1&manifest_json=";
   const slackAppInstallUrl = baseSlackAppUrl + encodedSlackAppManifest;
 
-  useEffect(() => {
-    views();
-  }, []);
-
-  function views() {
+  const views = useCallback(() => {
     getGroups();
     setVisible(false);
     setSubmitLoading(false);
     getSettings();
-  }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    views();
+  }, [views]);
 
   async function validate() {
     let error = false;

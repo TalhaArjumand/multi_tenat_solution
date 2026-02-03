@@ -96,9 +96,9 @@ function Request(props) {
 
   async function getDuration(accountId) {
     setDuration("");
-    const duration = item.map((data) => {
-      data.accounts.map((account, index) => {
-        if (account.id == accountId) {
+    item.forEach((data) => {
+      data.accounts.forEach((account, index) => {
+        if (account.id === accountId) {
           setMaxDuration(data.duration);
         }
       });
@@ -108,9 +108,9 @@ function Request(props) {
   async function getPermissions(accountId) {
     let permissionData = [];
     setRole([]);
-    const permissions = item.map((data) => {
-      data.accounts.map((account) => {
-        if (account.id == accountId) {
+    item.forEach((data) => {
+      data.accounts.forEach((account) => {
+        if (account.id === accountId) {
           permissionData = permissionData.concat(data.permissions);
         }
       });
@@ -239,7 +239,7 @@ function Request(props) {
       error = true;
     }
     if (
-      params.DeploymentType == "delegated" &&
+      params.DeploymentType === "delegated" &&
       role &&
       mgmtPs.permissions.includes(role.value)
     ) {

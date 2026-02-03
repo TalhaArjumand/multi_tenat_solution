@@ -451,3 +451,69 @@ export const publishPermissions = /* GraphQL */ `
     }
   }
 `;
+export const createCustomers = /* GraphQL */ `
+  mutation CreateCustomers(
+    $input: CreateCustomersInput!
+    $condition: ModelCustomersConditionInput
+  ) {
+    createCustomers(input: $input, condition: $condition) {
+      id
+      name
+      description
+      accountIds
+      approverGroupIds
+      adminEmail
+      adminName
+      status
+      settings
+      createdAt
+      modifiedBy
+      metadata
+      __typename
+    }
+  }
+`;
+export const updateCustomers = /* GraphQL */ `
+  mutation UpdateCustomers(
+    $input: UpdateCustomersInput!
+    $condition: ModelCustomersConditionInput
+  ) {
+    updateCustomers(input: $input, condition: $condition) {
+      id
+      name
+      description
+      accountIds
+      approverGroupIds
+      adminEmail
+      adminName
+      status
+      settings
+      createdAt
+      modifiedBy
+      metadata
+      __typename
+    }
+  }
+`;
+export const deleteCustomers = /* GraphQL */ `
+  mutation DeleteCustomers(
+    $input: DeleteCustomersInput!
+    $condition: ModelCustomersConditionInput
+  ) {
+    deleteCustomers(input: $input, condition: $condition) {
+      id
+      name
+      description
+      accountIds
+      approverGroupIds
+      adminEmail
+      adminName
+      status
+      settings
+      createdAt
+      modifiedBy
+      metadata
+      __typename
+    }
+  }
+`;
