@@ -18,7 +18,7 @@ import {
 import { useCollection } from "@awsui/collection-hooks";
 import { getUserRequests, updateStatus, getSetting } from "../Shared/RequestService";
 import { API, graphqlOperation } from "aws-amplify";
-import { onUpdateRequests, onCreateRequests} from "../../graphql/subscriptions";
+import { onUpdateRequests} from "../../graphql/subscriptions";
 import Status from "../Shared/Status";
 import Details from "../Shared/Details";
 import "../../index.css";
@@ -460,7 +460,7 @@ function View(props) {
                     >
                       Ok
                     </Button>
-                    {selectedItems[0].status == "pending" && (
+                    {selectedItems[0].status === "pending" && (
                       <Button
                         disabled={selectedItems[0].status !== "pending"}
                         onClick={handleCancel}

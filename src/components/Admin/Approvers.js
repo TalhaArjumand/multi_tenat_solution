@@ -248,7 +248,7 @@ function Approvers(props) {
   const [accountStatus, setAccountStatus] = useState("finished");
 
   const [ous, setOUs] = useState([]);
-  const [ouStatus, setOUStatus] = useState("finished");
+  const [ouStatus, setOUStatus] = useState("finished"); // eslint-disable-line no-unused-vars
 
   const [approverList, setApproverList] = useState([]);
   const [approverStatus, setApproverStatus] = useState("finished");

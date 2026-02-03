@@ -556,3 +556,49 @@ export const validateRequest = /* GraphQL */ `
     }
   }
 `;
+export const getCustomers = /* GraphQL */ `
+  query GetCustomers($id: ID!) {
+    getCustomers(id: $id) {
+      id
+      name
+      description
+      accountIds
+      approverGroupIds
+      adminEmail
+      adminName
+      status
+      settings
+      createdAt
+      modifiedBy
+      metadata
+      __typename
+    }
+  }
+`;
+export const listCustomers = /* GraphQL */ `
+  query ListCustomers(
+    $filter: ModelCustomersFilterInput
+    $limit: Int
+    $nextToken: String
+  ) {
+    listCustomers(filter: $filter, limit: $limit, nextToken: $nextToken) {
+      items {
+        id
+        name
+        description
+        accountIds
+        approverGroupIds
+        adminEmail
+        adminName
+        status
+        settings
+        createdAt
+        modifiedBy
+        metadata
+        __typename
+      }
+      nextToken
+      __typename
+    }
+  }
+`;
