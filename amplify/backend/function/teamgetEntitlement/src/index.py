@@ -143,8 +143,8 @@ def get_customers():
             return []
         else:
             customers = response.get("data", {}).get("listCustomers", {}).get("items", [])
-            # Only return active customers
-            return [c for c in customers if c.get("status") == "active" or not c.get("status")]
+            # Only return active customers (status == 'active' or status is None/not set, which defaults to active)
+            return [c for c in customers if c.get("status") in ["active", None] or "status" not in c]
     except Exception as exception:
         print("Error fetching customers")
         print(exception)

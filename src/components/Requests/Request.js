@@ -489,12 +489,15 @@ function Request(props) {
                   setAccount(selected);
                   
                   // Extract customer info from the selected account
-                  const selectedAccountData = accounts.find(acc => acc.id === selected.value);
-                  if (selectedAccountData && selectedAccountData.customerId) {
-                    // Only update if account has customer info and no customer was previously selected
-                    if (!selectedCustomer || !selectedCustomer.value) {
+                  // Customer dropdown takes precedence over account's customer
+                  if (!selectedCustomer || !selectedCustomer.value) {
+                    const selectedAccountData = accounts.find(acc => acc.id === selected.value);
+                    if (selectedAccountData && selectedAccountData.customerId) {
                       setCustomerId(selectedAccountData.customerId);
                       setCustomerName(selectedAccountData.customerName || "");
+                    } else {
+                      setCustomerId("");
+                      setCustomerName("");
                     }
                   }
                   
@@ -504,11 +507,11 @@ function Request(props) {
                 selectedAriaLabel="selected"
               />
             </FormField>
-            {customerName && (
+            {customerName && selectedCustomer && selectedCustomer.value && (
               <FormField
-                label="Selected Customer"
+                label="Filtered by Customer"
                 stretch
-                description="This request will be associated with the following customer"
+                description="Accounts are filtered for the selected customer"
               >
                 <Input value={customerName} readOnly />
               </FormField>
