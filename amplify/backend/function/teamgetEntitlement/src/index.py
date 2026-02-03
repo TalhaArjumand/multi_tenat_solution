@@ -106,6 +106,74 @@ def get_entitlements(id):
     return response
 
 
+def get_customers():
+    """Fetch all customers from GraphQL API"""
+    session = boto3.session.Session()
+    credentials = session.get_credentials()
+    credentials = credentials.get_frozen_credentials()
+    region = session.region_name
+
+    query = """
+        query ListCustomers {
+            listCustomers {
+                items {
+                    id
+                    name
+                    accountIds
+                    status
+                }
+            }
+        }
+    """
+
+    endpoint = os.environ.get("API_TEAM_GRAPHQLAPIENDPOINTOUTPUT", None)
+    headers = {"Content-Type": "application/json"}
+    payload = {"query": query}
+
+    appsync_region = region
+    auth = AWSV4Sign(credentials, appsync_region, "appsync")
+
+    try:
+        response = requests.post(
+            endpoint, auth=auth, json=payload, headers=headers
+        ).json()
+        if "errors" in response:
+            print("Error attempting to query customers from AppSync")
+            print(response["errors"])
+            return []
+        else:
+            customers = response.get("data", {}).get("listCustomers", {}).get("items", [])
+            # Only return active customers
+            return [c for c in customers if c.get("status") == "active" or not c.get("status")]
+    except Exception as exception:
+        print("Error fetching customers")
+        print(exception)
+        return []
+
+
+def enrich_accounts_with_customer_info(accounts, customers):
+    """Add customer information to accounts"""
+    # Create a mapping of accountId to customer
+    account_to_customer = {}
+    for customer in customers:
+        if customer.get("accountIds"):
+            for account_id in customer["accountIds"]:
+                account_to_customer[account_id] = {
+                    "customerId": customer["id"],
+                    "customerName": customer["name"]
+                }
+    
+    # Enrich accounts with customer info
+    enriched_accounts = []
+    for account in accounts:
+        enriched_account = account.copy()
+        if account["id"] in account_to_customer:
+            enriched_account.update(account_to_customer[account["id"]])
+        enriched_accounts.append(enriched_account)
+    
+    return enriched_accounts
+
+
 def handler(event, context):
     userId = event["userId"]
     groupIds = event["groupIds"]
@@ -114,6 +182,10 @@ def handler(event, context):
     maxDuration = 0
     
     print("Id: ", event["id"])
+    
+    # Fetch customers to enrich account information
+    customers = get_customers()
+    print(f"Fetched {len(customers)} active customers")
 
     for id in [userId] + groupIds:
         if not id:
@@ -131,6 +203,9 @@ def handler(event, context):
         for ou in entitlement["Item"]["ous"]:
             data = list_account_for_ou(ou["id"])
             policy["accounts"].extend(data)
+
+        # Enrich accounts with customer information
+        policy["accounts"] = enrich_accounts_with_customer_info(policy["accounts"], customers)
 
         policy["permissions"] = entitlement["Item"]["permissions"]
         policy["approvalRequired"] = entitlement["Item"]["approvalRequired"]

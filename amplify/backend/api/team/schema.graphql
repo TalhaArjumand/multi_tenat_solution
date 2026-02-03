@@ -212,10 +212,14 @@ type Customers
 type data @aws_iam @aws_cognito_user_pools {
   name: String
   id: String
+  customerId: String
+  customerName: String
 }
 input DataInput {
   name: String
   id: String
+  customerId: String
+  customerName: String
 }
 type Eligibility
   @model

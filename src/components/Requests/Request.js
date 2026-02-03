@@ -27,6 +27,7 @@ import {
 import { useHistory } from "react-router-dom";
 import { API, graphqlOperation } from "aws-amplify";
 import { onPublishPolicy } from "../../graphql/subscriptions";
+import { listCustomers } from "../../graphql/queries";
 import params from "../../parameters.json";
 
 function Request(props) {
@@ -54,6 +55,7 @@ function Request(props) {
 
   const [accounts, setAccounts] = useState([]);
   const [accountStatus, setAccountStatus] = useState("loading");
+  const [allAccounts, setAllAccounts] = useState([]);
 
   const [permissions, setPermissions] = useState([]);
   const [permissionStatus, setPermissionStatus] = useState("loading");
@@ -68,6 +70,10 @@ function Request(props) {
   
   const [customerName, setCustomerName] = useState("");
   const [customerId, setCustomerId] = useState("");
+  
+  const [customers, setCustomers] = useState([]);
+  const [customersLoading, setCustomersLoading] = useState(true);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
 
   const history = useHistory();
 
@@ -133,7 +139,9 @@ function Request(props) {
         const policy = result.value.data.onPublishPolicy.policy;
         if (policy?.length > 0) {
           setItem(policy);
-          setAccounts(concatenateAccounts(policy));
+          const allAccts = concatenateAccounts(policy);
+          setAllAccounts(allAccts);
+          setAccounts(allAccts);
         }
         setAccountStatus("finished");
         setPermissionStatus("finished");
@@ -147,6 +155,34 @@ function Request(props) {
     
     // Return the subscription to allow external cleanup if needed
     return subscription;
+  }
+
+  async function fetchCustomers() {
+    setCustomersLoading(true);
+    try {
+      const result = await API.graphql(graphqlOperation(listCustomers));
+      const customerList = result.data.listCustomers.items || [];
+      // Only show active customers
+      const activeCustomers = customerList.filter(
+        c => c.status === 'active' || !c.status
+      );
+      setCustomers(activeCustomers);
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+    } finally {
+      setCustomersLoading(false);
+    }
+  }
+
+  function filterAccountsByCustomer(customerId) {
+    if (!customerId) {
+      // Show all accounts if no customer selected
+      setAccounts(allAccounts);
+    } else {
+      // Filter accounts by customer
+      const filtered = allAccounts.filter(acc => acc.customerId === customerId);
+      setAccounts(filtered);
+    }
   }
 
   function getSettings() {
@@ -173,7 +209,8 @@ function Request(props) {
     props.addNotification([]);
     getMgmtPs();
     setTime(moment().format());
-    publishEvent()
+    publishEvent();
+    fetchCustomers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -384,6 +421,50 @@ function Request(props) {
               <Input value={email} type="email" />
             </FormField>
             <FormField
+              label="Customer"
+              stretch
+              description="Select customer to filter accounts"
+            >
+              <Select
+                statusType={customersLoading ? "loading" : "finished"}
+                placeholder="Select a customer (optional)"
+                loadingText="Loading customers"
+                filteringType="auto"
+                empty="No customers found"
+                options={[
+                  { label: "All accounts", value: "" },
+                  ...customers.map((customer) => ({
+                    label: customer.name,
+                    value: customer.id,
+                    description: `${customer.accountIds?.length || 0} account(s)`,
+                  }))
+                ]}
+                selectedOption={selectedCustomer}
+                onChange={(event) => {
+                  const selected = event.detail.selectedOption;
+                  setSelectedCustomer(selected);
+                  
+                  // Clear account selection when customer changes
+                  setAccount([]);
+                  setRole([]);
+                  setPermissions([]);
+                  
+                  // Update customer info
+                  if (selected.value) {
+                    const customerData = customers.find(c => c.id === selected.value);
+                    setCustomerId(selected.value);
+                    setCustomerName(selected.label);
+                    filterAccountsByCustomer(selected.value);
+                  } else {
+                    setCustomerId("");
+                    setCustomerName("");
+                    filterAccountsByCustomer(null);
+                  }
+                }}
+                selectedAriaLabel="selected"
+              />
+            </FormField>
+            <FormField
               label="Account"
               stretch
               description="Target account for elevated access"
@@ -409,12 +490,12 @@ function Request(props) {
                   
                   // Extract customer info from the selected account
                   const selectedAccountData = accounts.find(acc => acc.id === selected.value);
-                  if (selectedAccountData) {
-                    setCustomerId(selectedAccountData.customerId || "");
-                    setCustomerName(selectedAccountData.customerName || "");
-                  } else {
-                    setCustomerId("");
-                    setCustomerName("");
+                  if (selectedAccountData && selectedAccountData.customerId) {
+                    // Only update if account has customer info and no customer was previously selected
+                    if (!selectedCustomer || !selectedCustomer.value) {
+                      setCustomerId(selectedAccountData.customerId);
+                      setCustomerName(selectedAccountData.customerName || "");
+                    }
                   }
                   
                   getPermissions(selected.value);
@@ -425,9 +506,9 @@ function Request(props) {
             </FormField>
             {customerName && (
               <FormField
-                label="Customer"
+                label="Selected Customer"
                 stretch
-                description="This account belongs to the following customer"
+                description="This request will be associated with the following customer"
               >
                 <Input value={customerName} readOnly />
               </FormField>
