@@ -7,28 +7,37 @@ import { Amplify, Auth, Hub } from "aws-amplify";
 import { Spin, Layout } from "antd";
 import awsconfig from "./aws-exports";
 import Nav from "./components/Navigation/Nav";
-import home from "./media/Home.svg";
+import SignInIdp from "./components/Navigation/SignInIdp";
+import logo from "./media/logo-transparent.png";
 import "./index.css";
-import { Button } from "@awsui/components-react";
+import "./signin-page.css";
 
-const { Header, Content } = Layout;
+const { Content } = Layout;
 
 Amplify.configure(awsconfig);
 
 function Home(props) {
   return (
-    <Layout className="site-layout">
-      <Header className="site-layout-background" style={{ padding: 0 }} />
-      <Content className="layout">
+    <Layout className="signin-page-layout">
+      <Content className="signin-page-content">
         <Spin spinning={props.loading} size="large">
-          <Button
-            className="homebutton"
-            variant="primary"
-            onClick={() => Auth.federatedSignIn()}
-          >
-            Federated Sign In
-          </Button>
-          <img src={home} alt="Homepage" className="home" />
+          <div className="signin-page-card">
+            <img src={logo} alt="CloudiQS" className="signin-page-logo" />
+            <h1 className="signin-page-title">CloudiQS MSP</h1>
+            <p className="signin-page-tagline">Multi-tenant solution for managed service providers</p>
+            <p className="signin-page-desc">
+              Temporary elevated access management for AWS IAM Identity Center.
+              Sign in with your organization credentials to request or manage access.
+            </p>
+            <button
+              type="button"
+              className="signin-page-button"
+              onClick={props.onGoToIdp}
+            >
+              Sign in with AWS
+            </button>
+            <p className="signin-page-footer">© CloudiQS · Secure access via IAM Identity Center</p>
+          </div>
         </Spin>
       </Content>
     </Layout>
@@ -41,6 +50,7 @@ function App() {
   const [userId, setUserId] = useState(null);
   const [groupIds, setGroupIds] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showIdpStep, setShowIdpStep] = useState(false);
 
   async function getUser() {
     try {
@@ -101,8 +111,13 @@ function App() {
           groups={groups}
           cognitoGroups={cognitoGroups}
         />
+      ) : showIdpStep ? (
+        <SignInIdp
+          loading={loading}
+          onBack={() => setShowIdpStep(false)}
+        />
       ) : (
-        <Home loading={loading} />
+        <Home loading={loading} onGoToIdp={() => setShowIdpStep(true)} />
       )}
     </div>
   );

@@ -1,0 +1,132 @@
+/* CloudiQS MSP – Sign-in / pre-login page */
+
+.signin-page-layout {
+  min-height: 100vh;
+  background: linear-gradient(145deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+}
+
+.signin-page-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem;
+}
+
+.signin-page-card {
+  max-width: 420px;
+  width: 100%;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+  padding: 2.5rem 2rem;
+  text-align: center;
+}
+
+.signin-page-logo {
+  display: block;
+  height: 48px;
+  width: auto;
+  margin: 0 auto 1.25rem;
+  object-fit: contain;
+}
+
+.signin-page-title {
+  margin: 0 0 0.25rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.signin-page-tagline {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.signin-page-desc {
+  margin: 0 0 1.75rem;
+  font-size: 0.875rem;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.signin-page-button {
+  display: inline-block;
+  width: 100%;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(90deg, #2563eb 0%, #1d4ed8 100%);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.signin-page-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px -6px rgba(37, 99, 235, 0.5);
+}
+
+.signin-page-button:active {
+  transform: translateY(0);
+}
+
+.signin-page-footer {
+  margin: 1.5rem 0 0;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+/* ----- Intermediary: Sign in with your corporate ID + IDC ----- */
+
+.signin-page-layout--idp .signin-page-card--idp {
+  max-width: 400px;
+}
+
+.signin-page-logo--idp {
+  height: 56px;
+  margin-bottom: 1.5rem;
+}
+
+.signin-page-tagline--idp {
+  font-size: 1.05rem;
+  color: #0f172a;
+  margin-bottom: 0.5rem;
+}
+
+.signin-page-desc--idp {
+  margin-bottom: 1.5rem;
+}
+
+.signin-page-button--idc {
+  background: linear-gradient(90deg, #232f3e 0%, #1a2332 100%);
+  font-size: 1.1rem;
+  padding: 0.85rem 1.5rem;
+  letter-spacing: 0.02em;
+}
+
+.signin-page-button--idc:hover {
+  box-shadow: 0 8px 20px -6px rgba(35, 47, 62, 0.5);
+}
+
+.signin-page-back {
+  display: block;
+  width: 100%;
+  margin-top: 1rem;
+  padding: 0.5rem;
+  font-size: 0.875rem;
+  color: #64748b;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.signin-page-back:hover {
+  color: #0f172a;
+}

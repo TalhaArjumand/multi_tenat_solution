@@ -32,16 +32,17 @@
   }
 }
 
-/* Hero logo */
+/* Hero logo – larger for visibility */
 .landing-hero__logo-wrap {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
 .landing-hero__logo {
-  height: 42px;
+  height: 64px;
   width: auto;
-  max-width: 200px;
+  max-width: 320px;
   display: block;
+  object-fit: contain;
 }
 
 /* Sections */
@@ -115,7 +116,7 @@
 .landing-pic {
   width: 100%;
   height: auto;
-  max-height: 280px;
+  max-height: 340px;
   object-fit: contain;
 }
 
