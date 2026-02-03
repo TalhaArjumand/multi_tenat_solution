@@ -112,6 +112,8 @@ type requests
     ]
   )
   session_duration: String
+  customerId: String
+  customerName: String
 }
 type sessions
   @model(subscriptions: { level: off })
@@ -133,6 +135,8 @@ type sessions
   approver_ids: [String]
   queryId: String
   expireAt: AWSTimestamp @ttl
+  customerId: String
+  customerName: String
 }
 type Approvers
   @model
@@ -151,6 +155,8 @@ type Approvers
   groupIds: [String]
   ticketNo: String
   modifiedBy: String
+  customerId: String
+  customerName: String
 }
 type Settings
   @model
@@ -177,6 +183,31 @@ type Settings
   slackToken: String
   teamAdminGroup: String
   teamAuditorGroup: String
+  teamCustomerAdminGroup: String
+}
+type Customers
+  @model
+  @auth(
+    rules: [
+      { allow: groups, groups: ["Admin"] }
+      { allow: groups, groupClaim: "scope", groups: ["api/admin"] }
+      { allow: groups, groups: ["CustomerAdmin"], operations: [read] }
+      { allow: private, operations: [read] }
+      { allow: private, provider: iam, operations: [read, update] }
+    ]
+  ) {
+  id: ID!
+  name: String!
+  description: String
+  accountIds: [String]
+  approverGroupIds: [String]
+  adminEmail: String
+  adminName: String
+  status: String
+  settings: AWSJSON
+  createdAt: AWSDateTime
+  modifiedBy: String
+  metadata: AWSJSON
 }
 type data @aws_iam @aws_cognito_user_pools {
   name: String
@@ -206,6 +237,8 @@ type Eligibility
   approvalRequired: Boolean
   duration: String
   modifiedBy: String
+  customerId: String
+  customerName: String
 }
 type Accounts {
   name: String!

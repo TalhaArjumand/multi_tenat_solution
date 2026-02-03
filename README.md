@@ -1,14 +1,36 @@
-# Temporary elevated access management (TEAM) for AWS IAM Identity Center
-This repository contains the source code for deploying TEAM application.
+# CloudiQS MSP - Temporary Elevated Access Management for AWS IAM Identity Center
+This repository contains the source code for deploying TEAM application with **MSP Multi-Customer enhancements**.
 
-TEAM is an open source solution that integrates with AWS IAM Identity Center and allows you to manage and monitor, time-bound elevated access to your multi-account AWS environment at scale.
+## 🆕 MSP Multi-Customer Features
+
+This fork extends the AWS TEAM solution with **Managed Service Provider (MSP)** capabilities:
+
+- **Multi-Customer Management**: Organize AWS accounts by customer organization
+- **Customer-Specific Access Control**: Assign approvers and eligibility policies per customer
+- **Customer Context Tracking**: Every access request and session is tagged with customer information
+- **Customer-Scoped Auditing**: Filter and export audit logs by customer organization
+- **Backwards Compatible**: Works seamlessly with existing TEAM deployments
+
+👉 **[MSP Setup Guide](docs/MSP_SETUP_GUIDE.md)** - Complete guide for multi-customer configuration
+
+## About TEAM
+
+TEAM is an open source solution that integrates with AWS IAM Identity Center and allows you to manage and monitor time-bound elevated access to your multi-account AWS environment at scale.
 
 The solution is a custom application that allows users to **request access to an AWS account** only when it is needed and only **for a specific period of time**. Once the time period has elapsed, elevated access is automatically removed.
 
 Refer to the [blog post on the AWS Security Blog](https://aws.amazon.com/blogs/security/temporary-elevated-access-management-with-iam-identity-center/) for a background and an overview of the TEAM solution.
 
 ![](docs/docs/assets/images/home_page.png)
+
 ## Getting Started
+
+### For MSP Multi-Customer Setup
+1. Follow the standard TEAM deployment instructions (see Quick links below)
+2. After deployment, refer to the **[MSP Setup Guide](docs/MSP_SETUP_GUIDE.md)** for customer configuration
+3. Navigate to **Administration → Customers** in the TEAM UI to create customer organizations
+
+### Standard TEAM Deployment
 Visit our **[Documentation pages](https://aws-samples.github.io/iam-identity-center-team/)** to learn more and get started installing and using TEAM.
 
 ### Quick links

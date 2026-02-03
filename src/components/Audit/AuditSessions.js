@@ -64,6 +64,13 @@ const COLUMN_DEFINITIONS = [
     minWidth: 10,
   },
   {
+    id: "customer",
+    sortingField: "customerName",
+    header: "Customer",
+    cell: (item) => item.customerName || "-",
+    minWidth: 10,
+  },
+  {
     id: "role",
     sortingField: "role",
     header: "Role",
@@ -136,6 +143,7 @@ const MyCollectionPreferences = ({ preferences, setPreferences }) => {
               // { id: "id", label: "Id", editable: false },
               { id: "email", label: "Requester" },
               { id: "account", label: "Account" },
+              { id: "customer", label: "Customer" },
               { id: "role", label: "Role" },
               // { id: "duration", label: "Duration" },
               { id: "startTime", label: "StartTime" },
@@ -173,6 +181,7 @@ function AuditSessions(props) {
     pageSize: 10,
     visibleContent: [
       "email",
+      "customer",
       "account",
       "role",
       // "duration",

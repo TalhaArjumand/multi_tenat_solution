@@ -12,6 +12,7 @@ import Request from "../Requests/Request";
 import Approvals from "../Approvals/Approvals";
 import Approvers from "../Admin/Approvers";
 import Settings from "../Admin/Settings";
+import Customers from "../Admin/Customers";
 import View from "../Requests/View";
 import Review from "../Approvals/Review";
 import AuditApprovals from "../Audit/AuditApprovals";
@@ -157,6 +158,16 @@ function Nav(props) {
                 {group && group.includes("Admin") ? (
                   <Route path="/admin/settings">
                     <Settings
+                      addNotification={setNotifications}
+                      setActiveHref={setActiveHref}
+                      user={User}
+                      group={group}
+                    />
+                  </Route>
+                ) : null}
+                {group && group.includes("Admin") ? (
+                  <Route path="/admin/customers">
+                    <Customers
                       addNotification={setNotifications}
                       setActiveHref={setActiveHref}
                       user={User}
