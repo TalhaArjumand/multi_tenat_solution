@@ -65,6 +65,9 @@ function Request(props) {
   const [maxDuration, setMaxDuration] = useState(9);
   const [ticketRequired, setTicketRequired] = useState(true);
   const [approvalRequired, setApprovalRequired] = useState(true);
+  
+  const [customerName, setCustomerName] = useState("");
+  const [customerId, setCustomerId] = useState("");
 
   const history = useHistory();
 
@@ -184,6 +187,8 @@ function Request(props) {
       startTime: time,
       justification: justification,
       ticketNo: ticketNo,
+      customerId: customerId || null,
+      customerName: customerName || null,
     };
     requestTeam(data).then(() => {
       setSubmitLoading(false);
@@ -394,17 +399,39 @@ function Request(props) {
                   label: account.name,
                   value: account.id,
                   description: account.id,
+                  tags: account.customerId ? [`Customer: ${account.customerName || account.customerId}`] : undefined,
                 }))}
                 selectedOption={account}
                 onChange={(event) => {
                   setAccountError();
-                  setAccount(event.detail.selectedOption);
-                  getPermissions(event.detail.selectedOption.value);
-                  getDuration(event.detail.selectedOption.value);
+                  const selected = event.detail.selectedOption;
+                  setAccount(selected);
+                  
+                  // Extract customer info from the selected account
+                  const selectedAccountData = accounts.find(acc => acc.id === selected.value);
+                  if (selectedAccountData) {
+                    setCustomerId(selectedAccountData.customerId || "");
+                    setCustomerName(selectedAccountData.customerName || "");
+                  } else {
+                    setCustomerId("");
+                    setCustomerName("");
+                  }
+                  
+                  getPermissions(selected.value);
+                  getDuration(selected.value);
                 }}
                 selectedAriaLabel="selected"
               />
             </FormField>
+            {customerName && (
+              <FormField
+                label="Customer"
+                stretch
+                description="This account belongs to the following customer"
+              >
+                <Input value={customerName} readOnly />
+              </FormField>
+            )}
             <FormField
               label="Role"
               stretch
