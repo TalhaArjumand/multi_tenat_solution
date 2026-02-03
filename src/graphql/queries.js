@@ -26,6 +26,8 @@ export const getRequests = /* GraphQL */ `
       ticketNo
       revokeComment
       session_duration
+      customerId
+      customerName
       createdAt
       updatedAt
       owner
@@ -63,6 +65,8 @@ export const listRequests = /* GraphQL */ `
         ticketNo
         revokeComment
         session_duration
+        customerId
+        customerName
         createdAt
         updatedAt
         owner
@@ -113,6 +117,8 @@ export const requestByEmailAndStatus = /* GraphQL */ `
         ticketNo
         revokeComment
         session_duration
+        customerId
+        customerName
         createdAt
         updatedAt
         owner
@@ -163,6 +169,8 @@ export const requestByApproverAndStatus = /* GraphQL */ `
         ticketNo
         revokeComment
         session_duration
+        customerId
+        customerName
         createdAt
         updatedAt
         owner
@@ -517,6 +525,8 @@ export const updateRequestData = /* GraphQL */ `
       ticketNo
       revokeComment
       session_duration
+      customerId
+      customerName
       createdAt
       updatedAt
       owner
@@ -549,6 +559,8 @@ export const validateRequest = /* GraphQL */ `
       ticketNo
       revokeComment
       session_duration
+      customerId
+      customerName
       createdAt
       updatedAt
       owner

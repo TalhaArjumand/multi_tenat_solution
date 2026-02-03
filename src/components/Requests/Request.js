@@ -179,9 +179,18 @@ function Request(props) {
       // Show all accounts if no customer selected
       setAccounts(allAccounts);
     } else {
-      // Filter accounts by customer
-      const filtered = allAccounts.filter(acc => acc.customerId === customerId);
-      setAccounts(filtered);
+      // Find the customer and get their accountIds
+      const customer = customers.find(c => c.id === customerId);
+      if (customer && customer.accountIds && customer.accountIds.length > 0) {
+        // Filter accounts by checking if account.id is in customer.accountIds
+        const filtered = allAccounts.filter(acc => 
+          customer.accountIds.includes(acc.id)
+        );
+        setAccounts(filtered);
+      } else {
+        // No accounts mapped to this customer
+        setAccounts([]);
+      }
     }
   }
 

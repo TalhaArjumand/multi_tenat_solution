@@ -29,6 +29,8 @@ export const createRequests = /* GraphQL */ `
       ticketNo
       revokeComment
       session_duration
+      customerId
+      customerName
       createdAt
       updatedAt
       owner
@@ -64,6 +66,8 @@ export const updateRequests = /* GraphQL */ `
       ticketNo
       revokeComment
       session_duration
+      customerId
+      customerName
       createdAt
       updatedAt
       owner
@@ -99,6 +103,8 @@ export const deleteRequests = /* GraphQL */ `
       ticketNo
       revokeComment
       session_duration
+      customerId
+      customerName
       createdAt
       updatedAt
       owner
