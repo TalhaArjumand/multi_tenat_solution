@@ -193,9 +193,9 @@ export const handler = async (event) => {
     };
   } catch (error) {
     console.error('Error getting invitation details:', error);
-    const errorData = { error: 'Internal server error', message: error.message };
+    const errorData = { error: 'Internal server error' };
     if (event.arguments) {
-      return { error: 'Internal server error' };
+      return errorData;
     }
     return {
       statusCode: 500,
@@ -203,7 +203,7 @@ export const handler = async (event) => {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
       },
-      body: JSON.stringify(errorData)
+      body: JSON.stringify({ error: 'Internal server error', message: error.message })
     };
   }
 };
