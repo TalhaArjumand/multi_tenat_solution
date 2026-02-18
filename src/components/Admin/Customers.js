@@ -332,7 +332,9 @@ function Customers(props) {
     try {
       // Generate a unique external ID for AssumeRole security
       const externalId = crypto.randomUUID ? crypto.randomUUID() : 
-        `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+        Array.from(crypto.getRandomValues(new Uint8Array(16)))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
       
       // Generate a secure invitation token
       const invitationToken = Array.from(crypto.getRandomValues(new Uint8Array(32)))
@@ -374,10 +376,26 @@ function Customers(props) {
             permissionSet: newCustomer.permissionSet
           });
           
-          alert(`Customer created successfully! An invitation email will be sent to ${adminEmail}`);
+          if (props.addNotification) {
+            props.addNotification([{
+              type: 'success',
+              content: `Customer created successfully! An invitation email will be sent to ${adminEmail}`,
+              dismissible: true,
+              dismissLabel: 'Dismiss',
+              onDismiss: () => props.addNotification([])
+            }]);
+          }
         } catch (emailError) {
           console.error('Error sending invitation email:', emailError);
-          alert('Customer created, but failed to send invitation email. You can resend it later.');
+          if (props.addNotification) {
+            props.addNotification([{
+              type: 'warning',
+              content: 'Customer created, but failed to send invitation email. You can resend it later.',
+              dismissible: true,
+              dismissLabel: 'Dismiss',
+              onDismiss: () => props.addNotification([])
+            }]);
+          }
         }
       }
       
@@ -386,7 +404,15 @@ function Customers(props) {
       resetForm();
     } catch (error) {
       console.error("Error creating customer:", error);
-      alert("Error creating customer: " + error.message);
+      if (props.addNotification) {
+        props.addNotification([{
+          type: 'error',
+          content: `Error creating customer: ${error.message}`,
+          dismissible: true,
+          dismissLabel: 'Dismiss',
+          onDismiss: () => props.addNotification([])
+        }]);
+      }
     } finally {
       setLoading(false);
     }

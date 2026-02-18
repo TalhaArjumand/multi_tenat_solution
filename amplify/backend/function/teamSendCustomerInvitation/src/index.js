@@ -19,6 +19,7 @@ const REGION = process.env.REGION;
 const GRAPHQL_ENDPOINT = process.env.API_TEAM_GRAPHQLAPIENDPOINTOUTPUT;
 const PORTAL_URL = process.env.PORTAL_URL || 'https://main.d13k6ou0ossrku.amplifyapp.com';
 const SENDER_EMAIL = process.env.SENDER_EMAIL || 'info@sfproject.com.pk';
+const INVITATION_EXPIRY_DAYS = parseInt(process.env.INVITATION_EXPIRY_DAYS || '7', 10);
 
 const sesClient = new SESClient({ region: REGION });
 
@@ -241,7 +242,7 @@ export const handler = async (event) => {
     
     const approvalUrl = `${PORTAL_URL}/customer-approval?token=${invitationToken}`;
     const sentAt = new Date().toISOString();
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
+    const expiresAt = new Date(Date.now() + INVITATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
     
     // Generate and send email
     const emailContent = generateInvitationEmail(

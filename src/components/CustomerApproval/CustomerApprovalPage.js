@@ -16,7 +16,11 @@ import {
 import { FaCheckCircle, FaTimesCircle, FaDownload, FaCloudUploadAlt, FaExclamationTriangle } from 'react-icons/fa';
 import { useLocation } from 'react-router-dom';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://your-api-gateway-url.execute-api.region.amazonaws.com/prod';
+const API_BASE_URL = process.env.REACT_APP_API_URL;
+
+if (!API_BASE_URL) {
+  console.error('REACT_APP_API_URL environment variable is not configured');
+}
 
 const CustomerApprovalPage = () => {
   const location = useLocation();
