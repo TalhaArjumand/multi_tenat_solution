@@ -396,6 +396,93 @@
       ],
       "providerPlugin": "awscloudformation",
       "service": "Lambda"
+    },
+    "teamGenerateCloudFormation": {
+      "build": true,
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
+    "teamVerifyCustomerRole": {
+      "build": true,
+      "dependsOn": [
+        {
+          "attributes": [
+            "GraphQLAPIIdOutput",
+            "GraphQLAPIEndpointOutput"
+          ],
+          "category": "api",
+          "resourceName": "team"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
+    "teamSendCustomerInvitation": {
+      "build": true,
+      "dependsOn": [
+        {
+          "attributes": [
+            "GraphQLAPIIdOutput",
+            "GraphQLAPIEndpointOutput"
+          ],
+          "category": "api",
+          "resourceName": "team"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
+    "teamGetInvitationDetails": {
+      "build": true,
+      "dependsOn": [
+        {
+          "attributes": [
+            "GraphQLAPIIdOutput",
+            "GraphQLAPIEndpointOutput"
+          ],
+          "category": "api",
+          "resourceName": "team"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
+    "teamApproveInvitation": {
+      "build": true,
+      "dependsOn": [
+        {
+          "attributes": [
+            "GraphQLAPIIdOutput",
+            "GraphQLAPIEndpointOutput"
+          ],
+          "category": "api",
+          "resourceName": "team"
+        },
+        {
+          "attributes": [
+            "Name"
+          ],
+          "category": "function",
+          "resourceName": "teamGenerateCloudFormation"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
+    "teamRejectInvitation": {
+      "build": true,
+      "dependsOn": [
+        {
+          "attributes": [
+            "GraphQLAPIIdOutput",
+            "GraphQLAPIEndpointOutput"
+          ],
+          "category": "api",
+          "resourceName": "team"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
     }
   },
   "hosting": {
@@ -707,6 +794,102 @@
         {
           "category": "function",
           "resourceName": "teamqueryLogs"
+        }
+      ]
+    },
+    "AMPLIFY_function_teamGenerateCloudFormation_deploymentBucketName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "teamGenerateCloudFormation"
+        }
+      ]
+    },
+    "AMPLIFY_function_teamGenerateCloudFormation_s3Key": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "teamGenerateCloudFormation"
+        }
+      ]
+    },
+    "AMPLIFY_function_teamVerifyCustomerRole_deploymentBucketName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "teamVerifyCustomerRole"
+        }
+      ]
+    },
+    "AMPLIFY_function_teamVerifyCustomerRole_s3Key": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "teamVerifyCustomerRole"
+        }
+      ]
+    },
+    "AMPLIFY_function_teamSendCustomerInvitation_deploymentBucketName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "teamSendCustomerInvitation"
+        }
+      ]
+    },
+    "AMPLIFY_function_teamSendCustomerInvitation_s3Key": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "teamSendCustomerInvitation"
+        }
+      ]
+    },
+    "AMPLIFY_function_teamGetInvitationDetails_deploymentBucketName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "teamGetInvitationDetails"
+        }
+      ]
+    },
+    "AMPLIFY_function_teamGetInvitationDetails_s3Key": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "teamGetInvitationDetails"
+        }
+      ]
+    },
+    "AMPLIFY_function_teamApproveInvitation_deploymentBucketName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "teamApproveInvitation"
+        }
+      ]
+    },
+    "AMPLIFY_function_teamApproveInvitation_s3Key": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "teamApproveInvitation"
+        }
+      ]
+    },
+    "AMPLIFY_function_teamRejectInvitation_deploymentBucketName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "teamRejectInvitation"
+        }
+      ]
+    },
+    "AMPLIFY_function_teamRejectInvitation_s3Key": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "teamRejectInvitation"
         }
       ]
     },
