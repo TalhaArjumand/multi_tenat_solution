@@ -29,6 +29,10 @@ Refer to the [blog post on the AWS Security Blog](https://aws.amazon.com/blogs/s
 1. Follow the standard TEAM deployment instructions (see Quick links below)
 2. After deployment, refer to the **[MSP Setup Guide](docs/MSP_SETUP_GUIDE.md)** for customer configuration
 3. Navigate to **Administration → Customers** in the TEAM UI to create customer organizations
+4. After every `amplify push api`, run the auth resolver fix script to enable unauthenticated customer approval:
+   ```bash
+   bash scripts/fix-appsync-auth-resolvers.sh
+   ```
 
 ### Standard TEAM Deployment
 Visit our **[Documentation pages](https://aws-samples.github.io/iam-identity-center-team/)** to learn more and get started installing and using TEAM.
