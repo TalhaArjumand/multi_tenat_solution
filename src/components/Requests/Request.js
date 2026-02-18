@@ -162,9 +162,10 @@ function Request(props) {
     try {
       const result = await API.graphql(graphqlOperation(listCustomers));
       const customerList = result.data.listCustomers.items || [];
-      // Only show active customers
+      // Only show active customers with established roles
       const activeCustomers = customerList.filter(
-        c => c.status === 'active' || !c.status
+        c => (c.status === 'active' || !c.status) && 
+             (c.roleStatus === 'established' || !c.roleStatus) // Allow legacy customers without roleStatus
       );
       setCustomers(activeCustomers);
     } catch (error) {
