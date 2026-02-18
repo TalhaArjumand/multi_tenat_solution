@@ -35,6 +35,42 @@ This uses the "identity broker pattern" with IAM role trust relationships instea
 8. MSP DevOps engineers can now request access to that customer account
 9. System uses AssumeRole (not organization access) to grant temporary access
 
+## IMPORTANT: FILE PATH CORRECTIONS
+
+This implementation guide has been updated with the CORRECT file paths based on the actual codebase:
+
+**Frontend Components:**
+- ✅ CORRECT: `src/components/Admin/Customers.js` (contains customer list AND creation modal)
+- ❌ WRONG: There is NO `src/components/Admin/CreateCustomer.js` file
+- ✅ CORRECT: `src/components/Requests/Request.js` (for creating access requests)
+- ❌ WRONG: There is NO `src/components/Request/CreateRequest.js` file
+- ✅ NEW: `src/components/CustomerApproval/CustomerApprovalPage.js` (needs to be created)
+- ✅ NEW: `src/components/Admin/RoleStatusIndicator.js` (needs to be created)
+- ✅ NEW: `src/components/Admin/CustomerDetails.js` (needs to be created - optional)
+
+**Lambda Functions:**
+All Lambda functions need to be created in: `amplify/backend/function/{functionName}/`
+
+NEW Lambda Functions to Create:
+1. `teamGenerateCloudFormation` - Generates CloudFormation templates
+2. `teamSendCustomerInvitation` - Sends invitation emails
+3. `teamVerifyCustomerRole` - Verifies customer IAM roles via AssumeRole
+4. `teamScheduledRoleVerification` - Daily scheduled verification job
+5. `teamCheckApprovalStatus` - Checks customer approval status
+6. Supporting Lambdas for API endpoints (invitation details, approve, reject)
+
+Existing Lambda to Update:
+- The Lambda that handles access granting (likely `teamRouter` or similar) needs to be updated to use AssumeRole instead of organization access
+
+**Environment Variables (ALREADY CONFIGURED):**
+- MSP_ACCOUNT_ID=722560225075
+- PORTAL_URL=https://main.d13k6ou0ossrku.amplifyapp.com
+- CUSTOMERS_TABLE=Customers-aulamfydfvg5fmjl4uboxne7du-main
+- SENDER_EMAIL=info@sfproject.com.pk
+
+**New Environment Variable Needed:**
+- VERIFY_ROLE_FUNCTION - ARN of teamVerifyCustomerRole Lambda (set after creating the Lambda)
+
 ## IMPLEMENTATION REQUIREMENTS
 
 ### PHASE 1: Customer Role-Based Onboarding
@@ -109,10 +145,50 @@ type Customers @model
     # If verification fails, store error message
 }
 
+IMPORTANT NOTE ABOUT GLOBAL SECONDARY INDEX (GSI):
+The teamGetInvitationDetails Lambda function requires querying by invitationToken.
+You need to add a GSI to the Customers table:
+- Index name: invitationToken-index
+- Partition key: invitationToken (String)
+
+To add this in Amplify:
+1. The GSI can be added using @index directive in GraphQL schema (Amplify transforms v2):
+   ```graphql
+   type Customers @model @auth(...) {
+     # ... existing fields
+     invitationToken: String @index(name: "byInvitationToken")
+   }
+   ```
+2. Or manually add it to the DynamoDB table via CloudFormation template
+3. Or add it via AWS Console after deployment
+
+Alternatively, you can modify the teamGetInvitationDetails Lambda to scan the table instead of querying,
+but this is less efficient for large datasets.
+
 2. LAMBDA FUNCTIONS TO CREATE
+
+IMPORTANT: To create a new Lambda function in Amplify:
+1. Run: `amplify add function`
+2. Select "Lambda function"
+3. Provide function name (e.g., teamGenerateCloudFormation)
+4. Choose runtime: Node.js or Python
+5. For Node.js functions, you can add npm packages in the function's package.json
+6. For Python functions, add dependencies to Pipfile
+
+Alternatively, you can manually create the directory structure following the pattern of existing functions.
+
+Each Lambda function directory should contain:
+- src/index.js (or index.py for Python)
+- function-parameters.json
+- {functionName}-cloudformation-template.json
+- package.json (for Node.js) or Pipfile (for Python)
+
 Create: amplify/backend/function/teamGenerateCloudFormation/
 
 Purpose: Generate CloudFormation template based on permission set
+
+Runtime: Node.js
+Required NPM Package: js-yaml (for YAML generation)
 
 JavaScript
 // amplify/backend/function/teamGenerateCloudFormation/src/index.js
@@ -434,8 +510,233 @@ exports.handler = async (event) => {
     };
   }
 };
+Create: amplify/backend/function/teamCheckApprovalStatus/
+
+Purpose: Check if customer has approved the invitation (used by Step Functions if implemented)
+
+JavaScript
+// amplify/backend/function/teamCheckApprovalStatus/src/index.js
+
+const AWS = require('aws-sdk');
+const dynamodb = new AWS.DynamoDB.DocumentClient();
+
+exports.handler = async (event) => {
+  const { customerId } = event;
+  
+  try {
+    const result = await dynamodb.get({
+      TableName: process.env.CUSTOMERS_TABLE,
+      Key: { id: customerId }
+    }).promise();
+    
+    if (!result.Item) {
+      throw new Error('Customer not found');
+    }
+    
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        customerId,
+        roleStatus: result.Item.roleStatus,
+        approvedAt: result.Item.approvedAt
+      })
+    };
+    
+  } catch (error) {
+    console.error('Error checking approval status:', error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: error.message })
+    };
+  }
+};
+
+Create: amplify/backend/function/teamGetInvitationDetails/
+
+Purpose: Get customer details by invitation token (for public approval page)
+
+JavaScript
+// amplify/backend/function/teamGetInvitationDetails/src/index.js
+
+const AWS = require('aws-sdk');
+const dynamodb = new AWS.DynamoDB.DocumentClient();
+
+exports.handler = async (event) => {
+  const body = JSON.parse(event.body);
+  const { invitationToken } = body;
+  
+  try {
+    // Query DynamoDB for customer with this invitation token
+    const result = await dynamodb.query({
+      TableName: process.env.CUSTOMERS_TABLE,
+      IndexName: 'invitationToken-index', // You may need to create this GSI
+      KeyConditionExpression: 'invitationToken = :token',
+      ExpressionAttributeValues: {
+        ':token': invitationToken
+      }
+    }).promise();
+    
+    if (!result.Items || result.Items.length === 0) {
+      return {
+        statusCode: 404,
+        body: JSON.stringify({ error: 'Invalid invitation token' })
+      };
+    }
+    
+    const customer = result.Items[0];
+    
+    // Check if invitation has expired
+    const expired = new Date(customer.invitationExpiresAt) < new Date();
+    
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        id: customer.id,
+        name: customer.name,
+        permissionSet: customer.permissionSet,
+        accountIds: customer.accountIds,
+        roleStatus: customer.roleStatus,
+        invitationExpiresAt: customer.invitationExpiresAt,
+        expired
+      })
+    };
+    
+  } catch (error) {
+    console.error('Error fetching invitation details:', error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: error.message })
+    };
+  }
+};
+
+Create: amplify/backend/function/teamApproveInvitation/
+
+Purpose: Mark customer as approved and return CloudFormation template
+
+JavaScript
+// amplify/backend/function/teamApproveInvitation/src/index.js
+
+const AWS = require('aws-sdk');
+const dynamodb = new AWS.DynamoDB.DocumentClient();
+
+exports.handler = async (event) => {
+  const body = JSON.parse(event.body);
+  const { invitationToken, customerId } = body;
+  
+  try {
+    // Verify invitation token matches
+    const customer = await dynamodb.get({
+      TableName: process.env.CUSTOMERS_TABLE,
+      Key: { id: customerId }
+    }).promise();
+    
+    if (!customer.Item || customer.Item.invitationToken !== invitationToken) {
+      return {
+        statusCode: 403,
+        body: JSON.stringify({ error: 'Invalid invitation token' })
+      };
+    }
+    
+    // Check if expired
+    if (new Date(customer.Item.invitationExpiresAt) < new Date()) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'Invitation has expired' })
+      };
+    }
+    
+    // Update customer status to approved
+    await dynamodb.update({
+      TableName: process.env.CUSTOMERS_TABLE,
+      Key: { id: customerId },
+      UpdateExpression: 'SET roleStatus = :status, approvedAt = :approvedAt',
+      ExpressionAttributeValues: {
+        ':status': 'approved',
+        ':approvedAt': new Date().toISOString()
+      }
+    }).promise();
+    
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        message: 'Access request approved',
+        cloudFormationTemplate: customer.Item.cloudFormationTemplate,
+        externalId: customer.Item.externalId,
+        customerId: customerId
+      })
+    };
+    
+  } catch (error) {
+    console.error('Error approving invitation:', error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: error.message })
+    };
+  }
+};
+
+Create: amplify/backend/function/teamRejectInvitation/
+
+Purpose: Mark customer as rejected
+
+JavaScript
+// amplify/backend/function/teamRejectInvitation/src/index.js
+
+const AWS = require('aws-sdk');
+const dynamodb = new AWS.DynamoDB.DocumentClient();
+
+exports.handler = async (event) => {
+  const body = JSON.parse(event.body);
+  const { invitationToken, customerId } = body;
+  
+  try {
+    // Verify invitation token matches
+    const customer = await dynamodb.get({
+      TableName: process.env.CUSTOMERS_TABLE,
+      Key: { id: customerId }
+    }).promise();
+    
+    if (!customer.Item || customer.Item.invitationToken !== invitationToken) {
+      return {
+        statusCode: 403,
+        body: JSON.stringify({ error: 'Invalid invitation token' })
+      };
+    }
+    
+    // Update customer status to rejected
+    await dynamodb.update({
+      TableName: process.env.CUSTOMERS_TABLE,
+      Key: { id: customerId },
+      UpdateExpression: 'SET roleStatus = :status',
+      ExpressionAttributeValues: {
+        ':status': 'rejected'
+      }
+    }).promise();
+    
+    // TODO: Send notification to MSP admin about rejection
+    
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        message: 'Access request rejected'
+      })
+    };
+    
+  } catch (error) {
+    console.error('Error rejecting invitation:', error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: error.message })
+    };
+  }
+};
+
 3. FRONTEND COMPONENTS
-Create: src/components/CustomerApproval/CustomerApprovalPage.js
+Create NEW: src/components/CustomerApproval/CustomerApprovalPage.js
+
+Note: This is a NEW component that needs to be created in a NEW directory.
+Create the directory first: src/components/CustomerApproval/
 
 Purpose: Public page where customers approve access requests
 
@@ -704,12 +1005,15 @@ function getPermissionDescription(permissionSet) {
 }
 
 export default CustomerApprovalPage;
-Update: src/components/Admin/CreateCustomer.js
+Update: src/components/Admin/Customers.js
 
-Add permission set selector and invitation flow
+Note: The file is Customers.js (not CreateCustomer.js). This file contains both the customer list 
+and customer creation functionality in a modal dialog.
+
+Add permission set selector and invitation flow to the existing customer creation modal.
 
 JavaScript
-// Add to existing CreateCustomer.js component
+// Add to existing src/components/Admin/Customers.js component
 
 import { Select, Steps, Button, message } from 'antd';
 
@@ -831,30 +1135,67 @@ async function handleCreateAndSendInvitation() {
   }
 }
 4. API GATEWAY ENDPOINTS
-Create REST API endpoints in amplify/backend/api/team/
 
-Add these to your API Gateway configuration:
+IMPORTANT: The system already has an API Gateway REST API (likely called "team").
+These endpoints should be added to the existing API Gateway configuration.
+
+In Amplify, this is typically done by:
+1. Running: `amplify update api`
+2. Selecting REST API
+3. Adding new paths and Lambda integrations
+
+OR by manually editing the API Gateway CloudFormation template in:
+amplify/backend/api/team/ (if REST API exists there)
+
+For each endpoint, you need to:
+- Create a Lambda function to handle the request
+- Add the Lambda as a target for the API Gateway path
+- Configure authentication (Cognito for admin endpoints, None for public endpoints)
+
+Endpoints to Create:
 
 JavaScript
 // POST /generate-cloudformation
-// Triggers: teamGenerateCloudFormation Lambda
+// Lambda: teamGenerateCloudFormation
+// Auth: Cognito/IAM Identity Center (Admin only)
+// Description: Generates CloudFormation template for customer
 
 // POST /send-customer-invitation  
-// Triggers: teamSendCustomerInvitation Lambda
+// Lambda: teamSendCustomerInvitation
+// Auth: Cognito/IAM Identity Center (Admin only)
+// Description: Sends invitation email to customer
 
 // POST /customer-invitation/details
-// Gets customer details by invitation token
+// Lambda: NEW Lambda to fetch customer by invitation token
+// Auth: None (public endpoint - token-based security)
+// Description: Gets customer details for approval page
 
 // POST /customer-invitation/approve
-// Marks customer as approved, triggers CFN generation
+// Lambda: NEW Lambda to mark customer as approved
+// Auth: None (public endpoint - token-based security)
+// Description: Approves access request and returns CloudFormation template
 
 // POST /customer-invitation/reject
-// Marks customer as rejected
+// Lambda: NEW Lambda to mark customer as rejected
+// Auth: None (public endpoint - token-based security)
+// Description: Rejects access request
 
 // POST /verify-customer-role
-// Triggers: teamVerifyCustomerRole Lambda
+// Lambda: teamVerifyCustomerRole
+// Auth: Cognito/IAM Identity Center (Admin only)
+// Description: Manually trigger role verification
 5. STEP FUNCTION WORKFLOW
+
+OPTIONAL: The Step Function workflow is OPTIONAL for this implementation.
+You can implement the customer onboarding flow without Step Functions by handling
+the workflow logic in the Lambda functions and frontend components.
+
+If you choose to implement Step Functions:
 Create: amplify/backend/custom/customerOnboarding/customerOnboardingStateMachine.json
+
+Note: You may need to create the directory structure and add a CloudFormation template
+to deploy the Step Function. Look at existing Step Functions in amplify/backend/custom/stepfunctions/
+for reference.
 
 JSON
 {
@@ -930,9 +1271,14 @@ JSON
 }
 PHASE 2: Access Request Integration
 6. UPDATE ELEVATED ACCESS TO USE ASSUMEROLE
-Update: amplify/backend/function/teamGrantAccess/src/index.js
 
-Replace organization account access with AssumeRole
+Note: The current system likely uses teamRouter Lambda or a similar function for access management.
+If teamGrantAccess does not exist, you'll need to identify the Lambda function that handles 
+granting access to customer accounts and update that function instead.
+
+Check amplify/backend/function/teamRouter/src/index.js or similar functions.
+
+Update the access granting logic to use AssumeRole instead of organization account access.
 
 JavaScript
 // OLD CODE (Remove):
@@ -1010,7 +1356,9 @@ exports.handler = async (event) => {
   };
 };
 7. UPDATE ACCOUNT SELECTOR IN REQUEST FORM
-Update: src/components/Request/CreateRequest.js
+Update: src/components/Requests/Request.js
+
+Note: The file is Request.js (not CreateRequest.js). This is the component where users create access requests.
 
 JavaScript
 // Update account fetching
@@ -1063,7 +1411,9 @@ async function fetchEligibleAccounts() {
   style={{ width: '100%' }}
 />
 8. ADD ROLE STATUS INDICATORS
-Create: src/components/Admin/RoleStatusIndicator.js
+Create NEW: src/components/Admin/RoleStatusIndicator.js
+
+Note: This is a NEW component that needs to be created.
 
 JavaScript
 import React from 'react';
@@ -1214,6 +1564,9 @@ exports.handler = async (event) => {
 };
 Add EventBridge rule to trigger daily:
 
+Note: This EventBridge rule should be added after the teamScheduledRoleVerification Lambda is created.
+You can add this to amplify/backend/custom/ as a CloudFormation template or configure it manually.
+
 JSON
 {
   "ScheduleExpression": "rate(1 day)",
@@ -1225,8 +1578,184 @@ JSON
 }
 
 Environment Variables
-MSP_ACCOUNT_ID=722560225075
-PORTAL_URL=https://main.d13k6ou0ossrku.amplifyapp.com
-CUSTOMERS_TABLE=Customers-aulamfydfvg5fmjl4uboxne7du-main
-SENDER_EMAIL=info@sfproject.com.pk
-VERIFY_ROLE_FUNCTION we havent any yet lambda function for it, you need to create it first, no idea about it yet help for this 
+
+IMPORTANT: These environment variables are ALREADY CONFIGURED in your system:
+- MSP_ACCOUNT_ID=722560225075
+- PORTAL_URL=https://main.d13k6ou0ossrku.amplifyapp.com
+- CUSTOMERS_TABLE=Customers-aulamfydfvg5fmjl4uboxne7du-main
+- SENDER_EMAIL=info@sfproject.com.pk
+
+You DO NOT need to set these again. They should be referenced in your Lambda functions.
+
+NEW Environment Variable Needed:
+- VERIFY_ROLE_FUNCTION: This will be the ARN of the teamVerifyCustomerRole Lambda function.
+  This needs to be set AFTER you create the teamVerifyCustomerRole Lambda function.
+  Format: arn:aws:lambda:REGION:ACCOUNT:function:teamVerifyCustomerRole-{env}
+  
+  This variable is used by teamScheduledRoleVerification to invoke the verification Lambda.
+
+## RECOMMENDED IMPLEMENTATION ORDER
+
+This is the recommended order to implement the changes to minimize errors and dependencies:
+
+### Step 1: Database Schema Update (DO THIS FIRST)
+1. Update `amplify/backend/api/team/schema.graphql` to add new fields to Customers type
+2. Add GSI for invitationToken if using query-based approach (or plan to use scan)
+3. Run `amplify push` to deploy schema changes
+4. Verify changes in DynamoDB console
+
+### Step 2: Core Lambda Functions
+Create these Lambda functions in order:
+1. **teamGenerateCloudFormation** - No dependencies
+   - Add js-yaml to package.json
+   - Test with sample data
+2. **teamVerifyCustomerRole** - No dependencies
+   - Configure IAM permissions for sts:AssumeRole
+   - Test with a manually created role
+3. **teamSendCustomerInvitation** - No dependencies
+   - Verify SES email address first
+   - Test email sending
+4. **teamCheckApprovalStatus** - Depends on DynamoDB schema
+   - Test with sample customer data
+
+### Step 3: API Endpoint Lambda Functions
+Create these Lambda functions:
+1. **teamGetInvitationDetails** - Depends on DynamoDB GSI
+2. **teamApproveInvitation** - Depends on DynamoDB schema
+3. **teamRejectInvitation** - Depends on DynamoDB schema
+
+### Step 4: API Gateway Configuration
+1. Add REST API endpoints to existing API Gateway
+2. Connect Lambda functions to endpoints
+3. Configure authentication (Cognito for admin, None for public)
+4. Test each endpoint with Postman or curl
+
+### Step 5: Frontend - Customer Approval Page (Public)
+1. Create directory: `src/components/CustomerApproval/`
+2. Create `CustomerApprovalPage.js`
+3. Add route in App.js: `/customer-approval/:token`
+4. Test with mock invitation token
+
+### Step 6: Frontend - Admin Components
+1. Create `RoleStatusIndicator.js` component
+2. Update `Customers.js` to add:
+   - Permission set selector in create modal
+   - New columns in customer list table
+   - Integration with new API endpoints
+3. Test customer creation flow
+
+### Step 7: Frontend - Request Component Update
+1. Update `src/components/Requests/Request.js`
+2. Modify account fetching to use Customers with roleStatus='established'
+3. Test account selection shows only established customers
+
+### Step 8: Scheduled Verification (OPTIONAL - Can be done later)
+1. Create **teamScheduledRoleVerification** Lambda
+2. Set VERIFY_ROLE_FUNCTION environment variable
+3. Create EventBridge rule to trigger daily
+4. Test manual invocation first
+
+### Step 9: Update Access Grant Logic
+1. Identify the Lambda function that grants access (teamRouter or similar)
+2. Update to use AssumeRole instead of organization access
+3. Add customer lookup by accountId
+4. Test the full flow: Create customer → Approve → Deploy CFN → Verify → Request access
+
+### Step 10: Step Functions (OPTIONAL)
+1. Only implement if you want automated workflow orchestration
+2. Create state machine in `amplify/backend/custom/customerOnboarding/`
+3. Add CloudFormation template to deploy state machine
+4. Integrate with customer creation flow
+
+## TESTING CHECKLIST
+
+After implementation, test this complete flow:
+
+1. **Customer Creation & Invitation**
+   - [ ] Admin creates customer with permission set selection
+   - [ ] CloudFormation template is generated correctly
+   - [ ] Invitation email is sent with correct approval link
+   - [ ] Customer receives email with all details
+
+2. **Customer Approval**
+   - [ ] Customer clicks approval link
+   - [ ] Approval page loads with customer details
+   - [ ] Customer can approve or reject
+   - [ ] After approval, CloudFormation template downloads
+   - [ ] Customer status updates to 'approved'
+
+3. **Role Deployment & Verification**
+   - [ ] Customer runs CloudFormation in their AWS account
+   - [ ] Role is created with correct trust policy
+   - [ ] ExternalId is configured correctly
+   - [ ] System verifies role via AssumeRole
+   - [ ] Customer status updates to 'established'
+
+4. **Access Request**
+   - [ ] DevOps engineer creates access request
+   - [ ] Only established customer accounts appear in dropdown
+   - [ ] Account selection shows customer context
+   - [ ] Request is submitted successfully
+
+5. **Access Grant**
+   - [ ] Request is approved
+   - [ ] System uses AssumeRole to access customer account
+   - [ ] Temporary credentials are generated
+   - [ ] Access works as expected
+
+6. **Scheduled Verification** (if implemented)
+   - [ ] Verification runs daily
+   - [ ] All established roles are checked
+   - [ ] Failed verifications are logged
+   - [ ] Customer status updates on failure
+
+## TROUBLESHOOTING COMMON ISSUES
+
+### Issue: "SES Email not verified"
+**Solution:** Verify sender email in SES console, or move out of SES sandbox for production
+
+### Issue: "Cannot assume role - Access Denied"
+**Solution:** Check:
+- Lambda execution role has sts:AssumeRole permission
+- Customer's role trust policy includes your MSP account ID
+- ExternalId matches exactly
+
+### Issue: "Invitation token not found"
+**Solution:** 
+- Verify GSI is created on invitationToken field
+- Or modify Lambda to use scan instead of query
+- Check token is being stored correctly
+
+### Issue: "CloudFormation template invalid"
+**Solution:** 
+- Test template in AWS CloudFormation console
+- Verify YAML syntax with online validator
+- Check MSP_ACCOUNT_ID environment variable is set
+
+### Issue: "Cannot query DynamoDB - Index not found"
+**Solution:**
+- Add GSI to Customers table for invitationToken
+- Or modify teamGetInvitationDetails to use scan
+- Verify Amplify schema has @index directive
+
+## SECURITY CONSIDERATIONS
+
+1. **ExternalId**: Always use ExternalId in AssumeRole to prevent confused deputy problem
+2. **Invitation Tokens**: Use cryptographically secure random tokens (crypto.randomBytes)
+3. **Token Expiration**: Enforce 7-day expiration on invitation tokens
+4. **Rate Limiting**: Consider adding rate limiting to public API endpoints
+5. **Email Verification**: Verify customer email addresses before sending invitations
+6. **Audit Logging**: Log all AssumeRole operations and access grants
+7. **Least Privilege**: Encourage customers to use read-only permission set when possible
+
+## ADDITIONAL NOTES
+
+- This implementation maintains backward compatibility - existing organization-based customers can continue to work
+- You can run both approaches in parallel during transition period
+- Consider adding metrics and monitoring for role verification failures
+- Document the customer onboarding process for your customer success team
+- Create CloudFormation template examples for common use cases
+
+---
+
+**END OF IMPLEMENTATION GUIDE** 
