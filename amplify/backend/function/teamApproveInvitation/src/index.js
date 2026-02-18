@@ -116,10 +116,14 @@ export const handler = async (event) => {
   console.log('Received event:', JSON.stringify(event, null, 2));
   
   try {
-    // Handle both direct invocation and API Gateway
+    // Handle AppSync @function, API Gateway, and direct invocation
     let invitationToken, roleArn;
     
-    if (event.body) {
+    if (event.arguments) {
+      // AppSync @function invocation
+      invitationToken = event.arguments.invitationToken;
+      roleArn = event.arguments.roleArn;
+    } else if (event.body) {
       // API Gateway
       const body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
       invitationToken = body.invitationToken;
@@ -131,15 +135,17 @@ export const handler = async (event) => {
     }
     
     if (!invitationToken) {
+      const errorData = { error: 'Missing required field: invitationToken' };
+      if (event.arguments) {
+        return errorData;
+      }
       return {
         statusCode: 400,
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
         },
-        body: JSON.stringify({ 
-          error: 'Missing required field: invitationToken'
-        })
+        body: JSON.stringify(errorData)
       };
     }
     
@@ -163,15 +169,17 @@ export const handler = async (event) => {
     const listResult = await graphqlRequest(listQuery, { invitationToken });
     
     if (!listResult.listCustomers || listResult.listCustomers.items.length === 0) {
+      const errorData = { error: 'Invalid or expired invitation token' };
+      if (event.arguments) {
+        return errorData;
+      }
       return {
         statusCode: 404,
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
         },
-        body: JSON.stringify({ 
-          error: 'Invalid or expired invitation token'
-        })
+        body: JSON.stringify(errorData)
       };
     }
     
@@ -183,6 +191,10 @@ export const handler = async (event) => {
       const now = new Date();
       
       if (now > expiryDate) {
+        const errorData = { error: 'Invitation has expired' };
+        if (event.arguments) {
+          return errorData;
+        }
         return {
           statusCode: 410,
           headers: {
@@ -199,15 +211,17 @@ export const handler = async (event) => {
     
     // Check if already approved or rejected
     if (customer.roleStatus === 'rejected') {
+      const errorData = { error: 'Invitation has been rejected' };
+      if (event.arguments) {
+        return errorData;
+      }
       return {
         statusCode: 403,
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
         },
-        body: JSON.stringify({ 
-          error: 'Invitation has been rejected'
-        })
+        body: JSON.stringify(errorData)
       };
     }
     
@@ -234,6 +248,18 @@ export const handler = async (event) => {
     
     console.log(`Customer ${customer.id} approved successfully`);
     
+    const responseData = {
+      success: true,
+      id: customer.id,
+      name: customer.name,
+      roleStatus: 'approved',
+      approvedAt,
+      cloudFormationTemplate: cfnTemplate
+    };
+    
+    if (event.arguments) {
+      return responseData;
+    }
     return {
       statusCode: 200,
       headers: {
@@ -241,12 +267,9 @@ export const handler = async (event) => {
         'Access-Control-Allow-Origin': '*'
       },
       body: JSON.stringify({
-        success: true,
+        ...responseData,
         customerId: customer.id,
         customerName: customer.name,
-        roleStatus: 'approved',
-        approvedAt,
-        cloudFormationTemplate: cfnTemplate,
         nextSteps: [
           'Download the CloudFormation template',
           'Log in to your AWS account',
@@ -259,6 +282,9 @@ export const handler = async (event) => {
     };
   } catch (error) {
     console.error('Error approving invitation:', error);
+    if (event.arguments) {
+      return { error: 'Internal server error' };
+    }
     return {
       statusCode: 500,
       headers: {

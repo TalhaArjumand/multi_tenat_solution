@@ -394,6 +394,31 @@ type CustomerRoleVerificationResponse @aws_iam @aws_cognito_user_pools {
   verifiedAt: String
 }
 
+type InvitationDetailsResponse @aws_iam @aws_cognito_user_pools {
+  id: String
+  name: String
+  description: String
+  adminEmail: String
+  adminName: String
+  permissionSet: String
+  roleStatus: String
+  invitationSentAt: String
+  invitationExpiresAt: String
+  approvedAt: String
+  cloudFormationTemplate: String
+  error: String
+}
+
+type InvitationActionResponse @aws_iam @aws_cognito_user_pools {
+  success: Boolean
+  id: String
+  name: String
+  roleStatus: String
+  approvedAt: String
+  cloudFormationTemplate: String
+  error: String
+}
+
 type Query {
   getAccounts: [Accounts]
     @function(name: "teamgetAccounts-${env}")
@@ -459,5 +484,21 @@ type Query {
   ): CustomerRoleVerificationResponse
     @function(name: "teamVerifyCustomerRole-${env}")
     @auth(rules: [{ allow: private }])
+  getInvitationDetails(
+    invitationToken: String!
+  ): InvitationDetailsResponse
+    @function(name: "teamGetInvitationDetails-${env}")
+    @auth(rules: [{ allow: public, provider: iam }])
+  approveInvitation(
+    invitationToken: String!
+  ): InvitationActionResponse
+    @function(name: "teamApproveInvitation-${env}")
+    @auth(rules: [{ allow: public, provider: iam }])
+  rejectInvitation(
+    invitationToken: String!
+    reason: String
+  ): InvitationActionResponse
+    @function(name: "teamRejectInvitation-${env}")
+    @auth(rules: [{ allow: public, provider: iam }])
 }
 

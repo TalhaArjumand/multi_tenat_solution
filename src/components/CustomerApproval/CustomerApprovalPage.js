@@ -14,12 +14,52 @@ import {
 } from '@aws-amplify/ui-react';
 import { FaCheckCircle, FaTimesCircle, FaDownload, FaExclamationTriangle } from 'react-icons/fa';
 import { useLocation } from 'react-router-dom';
+import { API } from 'aws-amplify';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL;
+const getInvitationDetailsQuery = /* GraphQL */ `
+  query GetInvitationDetails($invitationToken: String!) {
+    getInvitationDetails(invitationToken: $invitationToken) {
+      id
+      name
+      description
+      adminEmail
+      adminName
+      permissionSet
+      roleStatus
+      invitationSentAt
+      invitationExpiresAt
+      approvedAt
+      cloudFormationTemplate
+      error
+    }
+  }
+`;
 
-if (!API_BASE_URL) {
-  console.error('REACT_APP_API_URL environment variable is not configured');
-}
+const approveInvitationQuery = /* GraphQL */ `
+  query ApproveInvitation($invitationToken: String!) {
+    approveInvitation(invitationToken: $invitationToken) {
+      success
+      id
+      name
+      roleStatus
+      approvedAt
+      cloudFormationTemplate
+      error
+    }
+  }
+`;
+
+const rejectInvitationQuery = /* GraphQL */ `
+  query RejectInvitation($invitationToken: String!, $reason: String) {
+    rejectInvitation(invitationToken: $invitationToken, reason: $reason) {
+      success
+      id
+      name
+      roleStatus
+      error
+    }
+  }
+`;
 
 const CustomerApprovalPage = () => {
   const location = useLocation();
@@ -48,18 +88,15 @@ const CustomerApprovalPage = () => {
       }
 
       try {
-        const response = await fetch(`${API_BASE_URL}/customer-invitation/details`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ invitationToken: token })
+        const result = await API.graphql({
+          query: getInvitationDetailsQuery,
+          variables: { invitationToken: token },
+          authMode: 'AWS_IAM'
         });
+        const data = result.data.getInvitationDetails;
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          setError(data.error || 'Failed to load invitation details');
+        if (data.error) {
+          setError(data.error);
           setLoading(false);
           return;
         }
@@ -90,23 +127,20 @@ const CustomerApprovalPage = () => {
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/customer-invitation/approve`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ invitationToken: token })
+      const result = await API.graphql({
+        query: approveInvitationQuery,
+        variables: { invitationToken: token },
+        authMode: 'AWS_IAM'
       });
+      const data = result.data.approveInvitation;
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || 'Failed to approve invitation');
+      if (data.error) {
+        setError(data.error);
         setApproving(false);
         return;
       }
 
-      setCustomer({ ...customer, ...data, cloudFormationTemplate: data.cloudFormationTemplate });
+      setCustomer({ ...customer, ...data });
       setApproved(true);
       setApproving(false);
     } catch (err) {
@@ -127,21 +161,15 @@ const CustomerApprovalPage = () => {
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/customer-invitation/reject`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          invitationToken: token,
-          reason: 'Customer rejected via approval page'
-        })
+      const result = await API.graphql({
+        query: rejectInvitationQuery,
+        variables: { invitationToken: token, reason: 'Customer rejected via approval page' },
+        authMode: 'AWS_IAM'
       });
+      const data = result.data.rejectInvitation;
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || 'Failed to reject invitation');
+      if (data.error) {
+        setError(data.error);
         setRejecting(false);
         return;
       }

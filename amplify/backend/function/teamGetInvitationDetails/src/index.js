@@ -75,10 +75,13 @@ export const handler = async (event) => {
   console.log('Received event:', JSON.stringify(event, null, 2));
   
   try {
-    // Handle both direct invocation and API Gateway
+    // Handle AppSync @function, API Gateway, and direct invocation
     let invitationToken;
     
-    if (event.body) {
+    if (event.arguments) {
+      // AppSync @function invocation
+      invitationToken = event.arguments.invitationToken;
+    } else if (event.body) {
       // API Gateway
       const body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
       invitationToken = body.invitationToken;
@@ -88,15 +91,17 @@ export const handler = async (event) => {
     }
     
     if (!invitationToken) {
+      const errorData = { error: 'Missing required field: invitationToken' };
+      if (event.arguments) {
+        return errorData;
+      }
       return {
         statusCode: 400,
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
         },
-        body: JSON.stringify({ 
-          error: 'Missing required field: invitationToken'
-        })
+        body: JSON.stringify(errorData)
       };
     }
     
@@ -104,15 +109,17 @@ export const handler = async (event) => {
     const result = await graphqlRequest(listCustomersByTokenQuery, { invitationToken });
     
     if (!result.listCustomers || result.listCustomers.items.length === 0) {
+      const errorData = { error: 'Invalid or expired invitation token' };
+      if (event.arguments) {
+        return errorData;
+      }
       return {
         statusCode: 404,
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
         },
-        body: JSON.stringify({ 
-          error: 'Invalid or expired invitation token'
-        })
+        body: JSON.stringify(errorData)
       };
     }
     
@@ -124,6 +131,10 @@ export const handler = async (event) => {
       const now = new Date();
       
       if (now > expiryDate) {
+        const errorData = { error: 'Invitation has expired' };
+        if (event.arguments) {
+          return errorData;
+        }
         return {
           statusCode: 410,
           headers: {
@@ -140,21 +151,22 @@ export const handler = async (event) => {
     
     // Check if already rejected
     if (customer.roleStatus === 'rejected') {
+      const errorData = { error: 'Invitation has been rejected', roleStatus: customer.roleStatus };
+      if (event.arguments) {
+        return errorData;
+      }
       return {
         statusCode: 403,
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
         },
-        body: JSON.stringify({ 
-          error: 'Invitation has been rejected',
-          roleStatus: customer.roleStatus
-        })
+        body: JSON.stringify(errorData)
       };
     }
     
     // Return customer details (exclude sensitive fields)
-    const response = {
+    const responseData = {
       id: customer.id,
       name: customer.name,
       description: customer.description,
@@ -168,26 +180,30 @@ export const handler = async (event) => {
       cloudFormationTemplate: customer.cloudFormationTemplate
     };
     
+    if (event.arguments) {
+      return responseData;
+    }
     return {
       statusCode: 200,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
       },
-      body: JSON.stringify(response)
+      body: JSON.stringify(responseData)
     };
   } catch (error) {
     console.error('Error getting invitation details:', error);
+    const errorData = { error: 'Internal server error' };
+    if (event.arguments) {
+      return errorData;
+    }
     return {
       statusCode: 500,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
       },
-      body: JSON.stringify({ 
-        error: 'Internal server error',
-        message: error.message 
-      })
+      body: JSON.stringify({ error: 'Internal server error', message: error.message })
     };
   }
 };
