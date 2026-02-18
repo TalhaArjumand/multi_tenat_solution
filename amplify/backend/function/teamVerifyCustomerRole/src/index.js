@@ -76,7 +76,7 @@ async function verifyRoleAccess(roleArn, externalId, customerId) {
     
     const command = new AssumeRoleCommand({
       RoleArn: roleArn,
-      RoleSessionName: `CloudIQS-Verification-${customerId}-${Date.now()}`,
+      RoleSessionName: `CIQ-Verify-${customerId.substring(0, 8)}-${Date.now()}`,
       ExternalId: externalId,
       DurationSeconds: 900 // 15 minutes (minimum allowed)
     });
