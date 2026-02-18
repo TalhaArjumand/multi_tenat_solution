@@ -264,7 +264,9 @@
                 "ses:SendRawEmail"
               ],
               "Resource": [
-                "*"
+                {
+                  "Fn::Sub": "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/*"
+                }
               ],
               "Effect": "Allow"
             }
