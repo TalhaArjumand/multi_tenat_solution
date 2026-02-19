@@ -1,0 +1,125 @@
+{
+    "Comment": "TEAM Grant Workflow - Dual Path (SSO + Multi-Tenant)",
+    "StartAt": "CheckMultiTenant",
+    "States": {
+      "CheckMultiTenant": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:REGION:ACCOUNT:function:teamMultiTenantGrant",
+        "ResultPath": "$",
+        "Next": "IsMultiTenant",
+        "Retry": [
+          {
+            "ErrorEquals": ["States.TaskFailed"],
+            "IntervalSeconds": 3,
+            "MaxAttempts": 2,
+            "BackoffRate": 2
+          }
+        ],
+        "Catch": [
+          {
+            "ErrorEquals": ["States.ALL"],
+            "Next": "GrantError",
+            "ResultPath": "$.error"
+          }
+        ]
+      },
+      "IsMultiTenant": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.isMultiTenant",
+            "BooleanEquals": true,
+            "Next": "MultiTenantUpdateStatus"
+          }
+        ],
+        "Default": "ExistingSSOGrant"
+      },
+      "ExistingSSOGrant": {
+        "Type": "Task",
+        "Comment": "This is your EXISTING CreateAccountAssignment call - keep it as-is",
+        "Resource": "arn:aws:states:::aws-sdk:ssoadmin:createAccountAssignment",
+        "Parameters": {
+          "InstanceArn.$": "$.instanceARN",
+          "PermissionSetArn.$": "$.roleId",
+          "PrincipalId.$": "$.userId",
+          "PrincipalType": "USER",
+          "TargetId.$": "$.accountId",
+          "TargetType": "AWS_ACCOUNT"
+        },
+        "ResultPath": "$.grant",
+        "Next": "UpdateStatusInProgress"
+      },
+      "MultiTenantUpdateStatus": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:REGION:ACCOUNT:function:teamStatus",
+        "Next": "NotifyGranted"
+      },
+      "UpdateStatusInProgress": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:REGION:ACCOUNT:function:teamStatus",
+        "Next": "NotifyGranted"
+      },
+      "NotifyGranted": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:REGION:ACCOUNT:function:teamNotifications",
+        "Next": "WaitForDuration"
+      },
+      "WaitForDuration": {
+        "Type": "Wait",
+        "SecondsPath": "$.duration",
+        "Next": "CheckRevokeType"
+      },
+      "CheckRevokeType": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.isMultiTenant",
+            "BooleanEquals": true,
+            "Next": "MultiTenantRevoke"
+          }
+        ],
+        "Default": "ExistingSSORevoke"
+      },
+      "ExistingSSORevoke": {
+        "Type": "Task",
+        "Comment": "Existing SSO revoke - DeleteAccountAssignment",
+        "Resource": "arn:aws:states:::aws-sdk:ssoadmin:deleteAccountAssignment",
+        "Parameters": {
+          "InstanceArn.$": "$.instanceARN",
+          "PermissionSetArn.$": "$.roleId",
+          "PrincipalId.$": "$.userId",
+          "PrincipalType": "USER",
+          "TargetId.$": "$.accountId",
+          "TargetType": "AWS_ACCOUNT"
+        },
+        "ResultPath": "$.revoke",
+        "Next": "UpdateStatusEnded"
+      },
+      "MultiTenantRevoke": {
+        "Type": "Pass",
+        "Comment": "For multi-tenant, STS credentials auto-expire. Just update status.",
+        "Result": {
+          "AccountAssignmentDeletionStatus": {
+            "Status": "IN_PROGRESS"
+          }
+        },
+        "ResultPath": "$.revoke",
+        "Next": "UpdateStatusEnded"
+      },
+      "UpdateStatusEnded": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:REGION:ACCOUNT:function:teamStatus",
+        "Next": "NotifyEnded"
+      },
+      "NotifyEnded": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:REGION:ACCOUNT:function:teamNotifications",
+        "End": true
+      },
+      "GrantError": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:REGION:ACCOUNT:function:teamStatus",
+        "End": true
+      }
+    }
+  }

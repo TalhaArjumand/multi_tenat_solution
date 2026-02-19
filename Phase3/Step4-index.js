@@ -1,0 +1,173 @@
+import yaml from 'js-yaml';
+
+const MSP_ACCOUNT_ID = process.env.MSP_ACCOUNT_ID || '722560225075';
+
+/**
+ * Role definitions that will be created in the customer's account.
+ * Each role maps to a specific set of AWS managed policies.
+ * The customer deploys ONE CloudFormation stack that creates ALL roles.
+ */
+const ROLE_DEFINITIONS = {
+  'ReadOnlyAccess': {
+    roleName: 'CloudIQS-MSP-ReadOnlyRole',
+    managedPolicies: ['arn:aws:iam::aws:policy/ReadOnlyAccess'],
+    description: 'Read-only access for security assessments and monitoring'
+  },
+  'S3FullAccess': {
+    roleName: 'CloudIQS-MSP-S3AdminRole',
+    managedPolicies: ['arn:aws:iam::aws:policy/AmazonS3FullAccess'],
+    description: 'Full S3 access for data management'
+  },
+  'EC2FullAccess': {
+    roleName: 'CloudIQS-MSP-EC2AdminRole',
+    managedPolicies: ['arn:aws:iam::aws:policy/AmazonEC2FullAccess'],
+    description: 'Full EC2 access for infrastructure management'
+  },
+  'PowerUserAccess': {
+    roleName: 'CloudIQS-MSP-PowerUserRole',
+    managedPolicies: ['arn:aws:iam::aws:policy/PowerUserAccess'],
+    description: 'Power user access (full access except IAM)'
+  },
+  'AdministratorAccess': {
+    roleName: 'CloudIQS-MSP-AdminRole',
+    managedPolicies: ['arn:aws:iam::aws:policy/AdministratorAccess'],
+    description: 'Full administrative access'
+  },
+  'DatabaseAdmin': {
+    roleName: 'CloudIQS-MSP-DatabaseAdminRole',
+    managedPolicies: [
+      'arn:aws:iam::aws:policy/AmazonRDSFullAccess',
+      'arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess'
+    ],
+    description: 'Database administration access'
+  },
+  'NetworkAdmin': {
+    roleName: 'CloudIQS-MSP-NetworkAdminRole',
+    managedPolicies: [
+      'arn:aws:iam::aws:policy/AmazonVPCFullAccess',
+      'arn:aws:iam::aws:policy/AmazonRoute53FullAccess'
+    ],
+    description: 'Network administration access'
+  },
+  'SecurityAudit': {
+    roleName: 'CloudIQS-MSP-SecurityAuditRole',
+    managedPolicies: [
+      'arn:aws:iam::aws:policy/SecurityAudit',
+      'arn:aws:iam::aws:policy/AWSCloudTrail_ReadOnlyAccess'
+    ],
+    description: 'Security audit and compliance review'
+  }
+};
+
+function generateMultiRoleCloudFormation(selectedRoles, externalId, customerName) {
+  const template = {
+    AWSTemplateFormatVersion: '2010-09-09',
+    Description: `CloudIQS MSP Access Roles for ${customerName} - Multi-Role Setup`,
+    Metadata: {
+      'CloudIQS-MSP': {
+        CustomerName: customerName,
+        CreatedBy: 'CloudIQS MSP Portal',
+        Purpose: 'Cross-account access roles for managed services'
+      }
+    },
+    Resources: {},
+    Outputs: {}
+  };
+
+  // Create a role for each selected access level
+  for (const roleName of selectedRoles) {
+    const roleDef = ROLE_DEFINITIONS[roleName];
+    if (!roleDef) continue;
+
+    const resourceName = roleDef.roleName.replace(/-/g, '');
+    
+    template.Resources[resourceName] = {
+      Type: 'AWS::IAM::Role',
+      Properties: {
+        RoleName: roleDef.roleName,
+        Description: `${roleDef.description} - Managed by CloudIQS MSP`,
+        AssumeRolePolicyDocument: {
+          Version: '2012-10-17',
+          Statement: [
+            {
+              Effect: 'Allow',
+              Principal: {
+                AWS: `arn:aws:iam::${MSP_ACCOUNT_ID}:root`
+              },
+              Action: 'sts:AssumeRole',
+              Condition: {
+                StringEquals: {
+                  'sts:ExternalId': externalId
+                }
+              }
+            }
+          ]
+        },
+        ManagedPolicyArns: roleDef.managedPolicies,
+        MaxSessionDuration: 43200,
+        Tags: [
+          { Key: 'ManagedBy', Value: 'CloudIQS-MSP' },
+          { Key: 'Customer', Value: customerName },
+          { Key: 'AccessLevel', Value: roleName },
+          { Key: 'CreatedVia', Value: 'CloudFormation' }
+        ]
+      }
+    };
+
+    template.Outputs[`${resourceName}Arn`] = {
+      Description: `ARN of ${roleDef.roleName}`,
+      Value: { 'Fn::GetAtt': [resourceName, 'Arn'] }
+    };
+  }
+
+  return yaml.dump(template, { lineWidth: -1 });
+}
+
+export const handler = async (event) => {
+  console.log('Received event:', JSON.stringify(event, null, 2));
+  
+  const { customerId, customerName, permissionSet, externalId, selectedRoles } = event;
+  
+  if (!customerId || !customerName || !externalId) {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ error: 'Missing required fields' })
+    };
+  }
+
+  // Determine which roles to create
+  let rolesToCreate;
+  
+  if (selectedRoles && Array.isArray(selectedRoles) && selectedRoles.length > 0) {
+    // Explicit role selection
+    rolesToCreate = selectedRoles;
+  } else {
+    // Map from permission set to roles (backward compatible)
+    switch (permissionSet) {
+      case 'read-only':
+        rolesToCreate = ['ReadOnlyAccess', 'SecurityAudit'];
+        break;
+      case 'admin':
+        rolesToCreate = Object.keys(ROLE_DEFINITIONS); // All roles
+        break;
+      case 'custom':
+        rolesToCreate = ['ReadOnlyAccess']; // Default safe set
+        break;
+      default:
+        rolesToCreate = ['ReadOnlyAccess'];
+    }
+  }
+
+  const cfnTemplate = generateMultiRoleCloudFormation(rolesToCreate, externalId, customerName);
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({
+      customerId,
+      customerName,
+      permissionSet,
+      availableRoles: rolesToCreate,
+      cloudFormationTemplate: cfnTemplate
+    })
+  };
+};

@@ -1,0 +1,16 @@
+type MultiTenantCredentialsResponse @aws_iam @aws_cognito_user_pools {
+  consoleUrl: String
+  accessKeyId: String
+  secretAccessKey: String
+  sessionToken: String
+  expiration: String
+  error: String
+}
+
+# Add to the Query type:
+# getMultiTenantCredentials(
+#   requestId: String!
+#   accessType: String!
+# ): MultiTenantCredentialsResponse
+#   @function(name: "teamGetMultiTenantCredentials-${env}")
+#   @auth(rules: [{ allow: private }])
