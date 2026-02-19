@@ -1,5 +1,8 @@
 ## [Start] Field Authorization Steps. **
 #set( $isAuthorized = false )
+#if( $util.authType() == "API Key Authorization" )
+  #set( $isAuthorized = true )
+#end
 #if( $util.authType() == "IAM Authorization" )
   #set( $isAuthorized = true )
 #end

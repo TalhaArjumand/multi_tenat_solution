@@ -91,7 +91,7 @@ const CustomerApprovalPage = () => {
         const result = await API.graphql({
           query: getInvitationDetailsQuery,
           variables: { invitationToken: token },
-          authMode: 'AWS_IAM'
+          authMode: 'API_KEY'
         });
         const data = result.data.getInvitationDetails;
 
@@ -130,7 +130,7 @@ const CustomerApprovalPage = () => {
       const result = await API.graphql({
         query: approveInvitationQuery,
         variables: { invitationToken: token },
-        authMode: 'AWS_IAM'
+        authMode: 'API_KEY'
       });
       const data = result.data.approveInvitation;
 
@@ -164,7 +164,7 @@ const CustomerApprovalPage = () => {
       const result = await API.graphql({
         query: rejectInvitationQuery,
         variables: { invitationToken: token, reason: 'Customer rejected via approval page' },
-        authMode: 'AWS_IAM'
+        authMode: 'API_KEY'
       });
       const data = result.data.rejectInvitation;
 

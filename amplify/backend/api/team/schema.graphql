@@ -497,18 +497,18 @@ type Query {
     invitationToken: String!
   ): InvitationDetailsResponse
     @function(name: "teamGetInvitationDetails-${env}")
-    @auth(rules: [{ allow: public, provider: iam }])
+    @auth(rules: [{ allow: public }])
   approveInvitation(
     invitationToken: String!
   ): InvitationActionResponse
     @function(name: "teamApproveInvitation-${env}")
-    @auth(rules: [{ allow: public, provider: iam }])
+    @auth(rules: [{ allow: public }])
   rejectInvitation(
     invitationToken: String!
     reason: String
   ): InvitationActionResponse
     @function(name: "teamRejectInvitation-${env}")
-    @auth(rules: [{ allow: public, provider: iam }])
+    @auth(rules: [{ allow: public }])
   getMultiTenantCredentials(
     requestId: String!
     accessType: String!
