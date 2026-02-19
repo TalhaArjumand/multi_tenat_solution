@@ -6,8 +6,12 @@ $util.qr($ctx.stash.defaultValues.put("createdAt", $createdAt))
 $util.qr($ctx.stash.defaultValues.put("updatedAt", $createdAt))
 $util.qr($ctx.stash.defaultValues.put("status", "pending"))
 
+## Validate roleId - allow both SSO permission set ARNs AND multi-tenant role IDs
+#set( $isSSORoleId = $util.matches("^arn:aws:sso:::permissionSet\/ssoins-[a-zA-Z0-9-.]{16}\/ps-[a-zA-Z0-9-.]{16}$", $ctx.args.input.roleId) )
+#set( $isMultiTenantRoleId = $util.matches("^mt-[A-Za-z0-9]+$", $ctx.args.input.roleId) )
+
 #if (!$util.matches("^\d{12}$", $ctx.args.input.accountId) || 
-     !$util.matches("^arn:aws:sso:::permissionSet\/ssoins-[a-zA-Z0-9-.]{16}\/ps-[a-zA-Z0-9-.]{16}$", $ctx.args.input.roleId) ||
+     (!$isSSORoleId && !$isMultiTenantRoleId) ||
      !$util.matches("^[0-9]+", $ctx.args.input.duration) ||
      $Integer.parseInt($ctx.args.input.duration) > 8000 ||
      $Integer.parseInt($ctx.args.input.duration) < 1 ||

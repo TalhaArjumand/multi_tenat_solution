@@ -15,6 +15,7 @@ policy_table_name = os.getenv("POLICY_TABLE_NAME")
 settings_table_name = os.getenv("SETTINGS_TABLE_NAME")
 approver_table_name = os.getenv("APPROVER_TABLE_NAME")
 requests_table_name = os.getenv("REQUESTS_TABLE_NAME")
+customers_table_name = os.getenv("CUSTOMERS_TABLE_NAME")
 user_pool_id = os.getenv("AUTH_TEAM06DBB7FC_USERPOOLID")
 dynamodb = boto3.resource('dynamodb')
 approver_table = dynamodb.Table(approver_table_name)
@@ -500,6 +501,59 @@ def request_is_updated(status,data,username,request_id):
         updated = True
     return updated
 
+def get_allowed_roles_for_permission_set(permission_set):
+    """Map customer's permission set to allowed roles."""
+    if permission_set == 'admin':
+        return ['ReadOnlyAccess', 'S3FullAccess', 'EC2FullAccess', 'PowerUserAccess',
+                'AdministratorAccess', 'DatabaseAdmin', 'NetworkAdmin', 'SecurityAudit']
+    elif permission_set == 'read-only':
+        return ['ReadOnlyAccess', 'SecurityAudit']
+    else:
+        return ['ReadOnlyAccess', 'S3FullAccess', 'EC2FullAccess',
+                'DatabaseAdmin', 'NetworkAdmin', 'SecurityAudit']
+
+
+def check_multi_tenant_eligibility(request):
+    """
+    Check if request is for a multi-tenant customer account.
+    If so, validate eligibility based on Customers table.
+    """
+    account_id = request.get("accountId")
+    role_id = request.get("roleId", "")
+
+    if not role_id.startswith("mt-"):
+        return None
+
+    try:
+        customers_table = dynamodb.Table(customers_table_name)
+        response = customers_table.scan(
+            FilterExpression='contains(accountIds, :acctId) AND roleStatus = :status',
+            ExpressionAttributeValues={
+                ':acctId': account_id,
+                ':status': 'established'
+            }
+        )
+
+        if not response.get('Items'):
+            print(f"No established customer found for account {account_id}")
+            return False
+
+        customer = response['Items'][0]
+
+        role_name = role_id.replace("mt-", "")
+        allowed_roles = get_allowed_roles_for_permission_set(customer.get('permissionSet', 'read-only'))
+
+        if role_name not in allowed_roles:
+            print(f"Role {role_name} not allowed for customer {customer['name']} (permissionSet: {customer['permissionSet']})")
+            return False
+
+        return {"approval": True}
+
+    except Exception as e:
+        print(f"Error checking multi-tenant eligibility: {e}")
+        return False
+
+
 def handler(event, context):
     data = event["Records"].pop()["dynamodb"]["NewImage"]
     print("Checking if request is updated")
@@ -520,14 +574,25 @@ def handler(event, context):
                     }
             return updateRequest(input)
         print("Received event: %s" % json.dumps(request))
-        userId = get_user((data["username"]["S"])[4:])
-        request["userId"] = userId
-        eligible = get_eligibility(request, userId)
-        if eligible:
-            if approval_required:
-                approval_required = eligible["approval"]
-                request["approvalRequired"] = eligible["approval"]
-            invoke_workflow(request, approval_required, notification_config, team_config)
+        # Check if this is a multi-tenant request
+        role_id = data.get("roleId", {}).get("S", "")
+        if role_id.startswith("mt-"):
+            mt_eligible = check_multi_tenant_eligibility(request)
+            if mt_eligible is False:
+                return eligibility_error(request)
+            if mt_eligible:
+                request["approvalRequired"] = mt_eligible.get("approval", True)
+                request["isMultiTenant"] = True
+                invoke_workflow(request, True, notification_config, team_config)
+        else:
+            userId = get_user((data["username"]["S"])[4:])
+            request["userId"] = userId
+            eligible = get_eligibility(request, userId)
+            if eligible:
+                if approval_required:
+                    approval_required = eligible["approval"]
+                    request["approvalRequired"] = eligible["approval"]
+                invoke_workflow(request, approval_required, notification_config, team_config)
     else:
         print("Request not updated")
         

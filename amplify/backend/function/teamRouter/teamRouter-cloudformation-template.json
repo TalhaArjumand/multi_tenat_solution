@@ -171,7 +171,8 @@
             },
             "FN_TEAMNOTIFICATIONS_ARN": {
               "Ref": "functionteamNotificationsArn"
-            }
+            },
+            "CUSTOMERS_TABLE_NAME": "Customers-aulamfydfvg5fmjl4uboxne7du-main"
           }
         },
         "Role": {
@@ -306,6 +307,22 @@
               "Resource": {
                 "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Approvers-*"
               }
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "dynamodb:Scan",
+                "dynamodb:GetItem",
+                "dynamodb:Query"
+              ],
+              "Resource": [
+                {
+                  "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Customers-*"
+                },
+                {
+                  "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Customers-*/index/*"
+                }
+              ]
             }
           ]
         }

@@ -419,6 +419,15 @@ type InvitationActionResponse @aws_iam @aws_cognito_user_pools {
   error: String
 }
 
+type MultiTenantCredentialsResponse @aws_iam @aws_cognito_user_pools {
+  consoleUrl: String
+  accessKeyId: String
+  secretAccessKey: String
+  sessionToken: String
+  expiration: String
+  error: String
+}
+
 type Query {
   getAccounts: [Accounts]
     @function(name: "teamgetAccounts-${env}")
@@ -500,5 +509,11 @@ type Query {
   ): InvitationActionResponse
     @function(name: "teamRejectInvitation-${env}")
     @auth(rules: [{ allow: public, provider: iam }])
+  getMultiTenantCredentials(
+    requestId: String!
+    accessType: String!
+  ): MultiTenantCredentialsResponse
+    @function(name: "teamGetMultiTenantCredentials-${env}")
+    @auth(rules: [{ allow: private }])
 }
 
