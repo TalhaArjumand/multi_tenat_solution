@@ -261,7 +261,7 @@
                 "sts:AssumeRole"
               ],
               "Resource": [
-                "*"
+                "arn:aws:iam::*:role/CloudIQS-MSP-*"
               ],
               "Effect": "Allow"
             }
