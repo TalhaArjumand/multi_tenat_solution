@@ -22,7 +22,7 @@ function ActiveAccessActions({ request }) {
     !request ||
     !request.roleId ||
     !request.roleId.startsWith("mt-") ||
-    request.status !== "approved"
+    request.status !== "in progress"
   ) {
     return null;
   }
