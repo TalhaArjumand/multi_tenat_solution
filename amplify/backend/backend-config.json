@@ -122,6 +122,13 @@
           ],
           "category": "function",
           "resourceName": "teamNotifications"
+        },
+        {
+          "attributes": [
+            "Arn"
+          ],
+          "category": "function",
+          "resourceName": "teamMultiTenantGrant"
         }
       ],
       "providerPlugin": "awscloudformation",

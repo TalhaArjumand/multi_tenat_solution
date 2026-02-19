@@ -2,161 +2,29 @@
 
 ## Overview
 
-The Grant Step Function needs to be updated to support a dual-path flow: SSO (existing) and Multi-Tenant (new). The Step Function currently uses `CreateAccountAssignment` for SSO-based access. For multi-tenant customers, it should use the `teamMultiTenantGrant` Lambda which performs `sts:AssumeRole`.
+The Grant and Revoke Step Functions have been updated to support a dual-path flow: SSO (existing) and Multi-Tenant (new). These changes are fully integrated into the Amplify CloudFormation template and deploy automatically via `amplify push` or CI/CD pipeline — no manual AWS console changes required.
 
-## Updated Step Function Definition
+## What Changed
 
-Replace the existing Grant State Machine definition with the following:
+### Files Modified
+- **`amplify/backend/custom/stepfunctions/stepfunctions-cloudformation-template.json`** — Grant SM definition updated with dual-path, Revoke SM updated with multi-tenant branch, IAM role updated with Lambda invoke permission, new parameter for `teamMultiTenantGrant` ARN
+- **`amplify/backend/backend-config.json`** — Added `teamMultiTenantGrant` as a dependency of the `stepfunctions` custom resource
 
-```json
-{
-  "Comment": "TEAM Grant Workflow - Dual Path (SSO + Multi-Tenant)",
-  "StartAt": "CheckMultiTenant",
-  "States": {
-    "CheckMultiTenant": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:us-east-1:722560225075:function:teamMultiTenantGrant-main",
-      "ResultPath": "$",
-      "Next": "IsMultiTenant",
-      "Retry": [
-        {
-          "ErrorEquals": ["States.TaskFailed"],
-          "IntervalSeconds": 3,
-          "MaxAttempts": 2,
-          "BackoffRate": 2
-        }
-      ],
-      "Catch": [
-        {
-          "ErrorEquals": ["States.ALL"],
-          "Next": "GrantError",
-          "ResultPath": "$.error"
-        }
-      ]
-    },
-    "IsMultiTenant": {
-      "Type": "Choice",
-      "Choices": [
-        {
-          "Variable": "$.isMultiTenant",
-          "BooleanEquals": true,
-          "Next": "MultiTenantUpdateStatus"
-        }
-      ],
-      "Default": "ExistingSSOGrant"
-    },
-    "ExistingSSOGrant": {
-      "Type": "Task",
-      "Comment": "Existing CreateAccountAssignment call for SSO accounts",
-      "Resource": "arn:aws:states:::aws-sdk:ssoadmin:createAccountAssignment",
-      "Parameters": {
-        "InstanceArn.$": "$.instanceARN",
-        "PermissionSetArn.$": "$.roleId",
-        "PrincipalId.$": "$.userId",
-        "PrincipalType": "USER",
-        "TargetId.$": "$.accountId",
-        "TargetType": "AWS_ACCOUNT"
-      },
-      "ResultPath": "$.grant",
-      "Next": "UpdateStatusInProgress"
-    },
-    "MultiTenantUpdateStatus": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:us-east-1:722560225075:function:teamStatus-main",
-      "Next": "NotifyGranted"
-    },
-    "UpdateStatusInProgress": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:us-east-1:722560225075:function:teamStatus-main",
-      "Next": "NotifyGranted"
-    },
-    "NotifyGranted": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:us-east-1:722560225075:function:teamNotifications-main",
-      "Next": "WaitForDuration"
-    },
-    "WaitForDuration": {
-      "Type": "Wait",
-      "SecondsPath": "$.duration",
-      "Next": "CheckRevokeType"
-    },
-    "CheckRevokeType": {
-      "Type": "Choice",
-      "Choices": [
-        {
-          "Variable": "$.isMultiTenant",
-          "BooleanEquals": true,
-          "Next": "MultiTenantRevoke"
-        }
-      ],
-      "Default": "ExistingSSORevoke"
-    },
-    "ExistingSSORevoke": {
-      "Type": "Task",
-      "Comment": "Existing SSO revoke - DeleteAccountAssignment",
-      "Resource": "arn:aws:states:::aws-sdk:ssoadmin:deleteAccountAssignment",
-      "Parameters": {
-        "InstanceArn.$": "$.instanceARN",
-        "PermissionSetArn.$": "$.roleId",
-        "PrincipalId.$": "$.userId",
-        "PrincipalType": "USER",
-        "TargetId.$": "$.accountId",
-        "TargetType": "AWS_ACCOUNT"
-      },
-      "ResultPath": "$.revoke",
-      "Next": "UpdateStatusEnded"
-    },
-    "MultiTenantRevoke": {
-      "Type": "Pass",
-      "Comment": "For multi-tenant, STS credentials auto-expire. Just update status.",
-      "Result": {
-        "AccountAssignmentDeletionStatus": {
-          "Status": "IN_PROGRESS"
-        }
-      },
-      "ResultPath": "$.revoke",
-      "Next": "UpdateStatusEnded"
-    },
-    "UpdateStatusEnded": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:us-east-1:722560225075:function:teamStatus-main",
-      "Next": "NotifyEnded"
-    },
-    "NotifyEnded": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:us-east-1:722560225075:function:teamNotifications-main",
-      "End": true
-    },
-    "GrantError": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:us-east-1:722560225075:function:teamStatus-main",
-      "End": true
-    }
-  }
-}
-```
-
-## How It Works
-
-### Grant Flow
-1. **CheckMultiTenant** — Invokes `teamMultiTenantGrant` Lambda which checks if the request's `roleId` starts with `mt-`
+### Grant State Machine — New Flow
+1. **CheckMultiTenant** — Invokes `teamMultiTenantGrant` Lambda (via `lambda:invoke`) which checks if the request's `roleId` starts with `mt-`
 2. **IsMultiTenant** — Choice state that branches based on `$.isMultiTenant` from the Lambda response
-3. If `true` → Skips SSO `CreateAccountAssignment`, goes to `MultiTenantUpdateStatus` → `NotifyGranted`
-4. If `false` → Uses existing SSO `CreateAccountAssignment` flow (`ExistingSSOGrant` → `UpdateStatusInProgress` → `NotifyGranted`)
+3. If `true` → Skips SSO `CreateAccountAssignment`, goes directly to `Update Request Status - in progress`
+4. If `false` (or if CheckMultiTenant fails) → Uses existing SSO `CreateAccountAssignment` flow (`Grant Permission`)
+5. Both paths converge at `Update Request Status - in progress` → `Notify Started` → `Wait` → `Revoke Permission`
 
-### Revoke Flow
-5. After the wait duration expires, `CheckRevokeType` branches again
-6. If multi-tenant → `MultiTenantRevoke` (Pass state, STS credentials auto-expire)
-7. If SSO → `ExistingSSORevoke` (`DeleteAccountAssignment`)
-8. Both paths converge at `UpdateStatusEnded` → `NotifyEnded`
+### Revoke State Machine — New Flow
+- Added `CheckRevokeType` choice state before `Revoke Permission`
+- If `$.isMultiTenant == true` → `MultiTenantRevoke` (Pass state, STS credentials auto-expire)
+- If `false` → Existing SSO `DeleteAccountAssignment` flow
+- Both paths converge at `Notify Requester Session Ended`
 
-## Deployment Instructions
+## Deployment
 
-1. Navigate to the AWS Step Functions console
-2. Find the Grant State Machine (ARN is in the `stepfunctions` custom resource outputs)
-3. Edit the state machine definition
-4. Replace the existing definition with the JSON above
-5. Update the Lambda ARNs to match your environment if they differ
-6. Save and test with both SSO and multi-tenant requests
+These changes deploy automatically when you push to CodeCommit and Amplify builds. No manual steps required.
 
-Alternatively, update the definition in `amplify/backend/custom/stepfunctions/stepfunctions-cloudformation-template.json` and run `amplify push`.
+Alternatively, run `amplify push` locally to deploy.

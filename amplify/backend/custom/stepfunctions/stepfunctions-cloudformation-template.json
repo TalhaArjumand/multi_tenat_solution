@@ -11,6 +11,10 @@
     "functionteamNotificationsArn": {
       "Type": "String",
       "Description": "Input parameter describing Arn attribute for function/teamNotifications resource"
+    },
+    "functionteamMultiTenantGrantArn": {
+      "Type": "String",
+      "Description": "Input parameter describing Arn attribute for function/teamMultiTenantGrant resource"
     }
   },
   "Resources": {
@@ -29,9 +33,113 @@
           ]
         },
         "Definition": {
-          "Comment": "Temporary Elevated Access Management - Grant state machine",
-          "StartAt": "Grant Permission",
+          "Comment": "Temporary Elevated Access Management - Grant state machine (SSO + Multi-Tenant)",
+          "StartAt": "CheckMultiTenant",
           "States": {
+            "CheckMultiTenant": {
+              "Type": "Task",
+              "Parameters": {
+                "FunctionName": {
+                  "Ref": "functionteamMultiTenantGrantArn"
+                },
+                "Payload.$": "$"
+              },
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Next": "IsMultiTenant",
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException",
+                    "Lambda.TooManyRequestsException"
+                  ],
+                  "IntervalSeconds": 3,
+                  "MaxAttempts": 2,
+                  "BackoffRate": 2
+                }
+              ],
+              "Catch": [
+                {
+                  "ErrorEquals": [
+                    "States.ALL"
+                  ],
+                  "Next": "Grant Permission",
+                  "ResultPath": "$.mtCheckError"
+                }
+              ],
+              "OutputPath": "$.Payload"
+            },
+            "IsMultiTenant": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.isMultiTenant",
+                  "BooleanEquals": true,
+                  "Next": "Update Request Status - in progress"
+                }
+              ],
+              "Default": "Grant Permission"
+            },
+            "Grant Permission": {
+              "Catch": [
+                {
+                  "ErrorEquals": [
+                    "States.ALL"
+                  ],
+                  "Next": "Update Request Status - in progress",
+                  "ResultPath": "$.statusError"
+                }
+              ],
+              "Next": "Update Request Status - in progress",
+              "Parameters": {
+                "InstanceArn.$": "$.instanceARN",
+                "PermissionSetArn.$": "$.roleId",
+                "PrincipalId.$": "$.userId",
+                "PrincipalType": "USER",
+                "TargetId.$": "$.accountId",
+                "TargetType": "AWS_ACCOUNT"
+              },
+              "Resource": "arn:aws:states:::aws-sdk:ssoadmin:createAccountAssignment",
+              "ResultPath": "$.grant",
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "SsoAdmin.ThrottlingException",
+                    "ThrottlingException",
+                    "ServiceUnavailable",
+                    "InternalServerError"
+                  ],
+                  "IntervalSeconds": 3,
+                  "BackoffRate": 2,
+                  "MaxAttempts": 5
+                }
+              ],
+              "Type": "Task"
+            },
+            "Update Request Status - in progress": {
+              "Next": "DynamoDB UpdateStartTime",
+              "Parameters": {
+                "FunctionName.$": "$.fn_teamstatus_arn",
+                "Payload.$": "$"
+              },
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "ResultPath": "$.lastTaskResult",
+              "Retry": [
+                {
+                  "BackoffRate": 2,
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException",
+                    "Lambda.TooManyRequestsException"
+                  ],
+                  "IntervalSeconds": 2,
+                  "MaxAttempts": 6
+                }
+              ],
+              "Type": "Task"
+            },
             "DynamoDB UpdateStartTime": {
               "Next": "Grant Error?",
               "Parameters": {
@@ -62,37 +170,6 @@
               ],
               "Default": "Notify Started",
               "Type": "Choice"
-            },
-            "Grant Permission": {
-              "Catch": [
-                {
-                  "ErrorEquals": [
-                    "States.ALL"
-                  ],
-                  "Next": "Update Request Status - in progress",
-                  "ResultPath": "$.statusError"
-                }
-              ],
-              "Next": "Update Request Status - in progress",
-              "Parameters": {
-                "InstanceArn.$": "$.instanceARN",
-                "PermissionSetArn.$": "$.roleId",
-                "PrincipalId.$": "$.userId",
-                "PrincipalType": "USER",
-                "TargetId.$": "$.accountId",
-                "TargetType": "AWS_ACCOUNT"
-              },
-              "Resource": "arn:aws:states:::aws-sdk:ssoadmin:createAccountAssignment",
-              "ResultPath": "$.grant",
-              "Retry": [
-                {
-                  "ErrorEquals": ["SsoAdmin.ThrottlingException", "ThrottlingException", "ServiceUnavailable", "InternalServerError"],
-                  "IntervalSeconds": 3,
-                  "BackoffRate": 2,
-                  "MaxAttempts": 5
-                }
-              ],
-              "Type": "Task"
             },
             "Notify Error": {
               "End": true,
@@ -149,6 +226,11 @@
               ],
               "Type": "Task"
             },
+            "Wait": {
+              "Next": "Revoke Permission",
+              "SecondsPath": "$.duration",
+              "Type": "Wait"
+            },
             "Revoke Permission": {
               "End": true,
               "Parameters": {
@@ -157,46 +239,24 @@
               },
               "Resource": "arn:aws:states:::states:startExecution",
               "Type": "Task"
-            },
-            "Update Request Status - in progress": {
-              "Next": "DynamoDB UpdateStartTime",
-              "Parameters": {
-                "FunctionName.$": "$.fn_teamstatus_arn",
-                "Payload.$": "$"
-              },
-              "Resource": "arn:aws:states:::lambda:invoke",
-              "ResultPath": "$.lastTaskResult",
-              "Retry": [
-                {
-                  "BackoffRate": 2,
-                  "ErrorEquals": [
-                    "Lambda.ServiceException",
-                    "Lambda.AWSLambdaException",
-                    "Lambda.SdkClientException",
-                    "Lambda.TooManyRequestsException"
-                  ],
-                  "IntervalSeconds": 2,
-                  "MaxAttempts": 6
-                }
-              ],
-              "Type": "Task"
-            },
-            "Wait": {
-              "Next": "Revoke Permission",
-              "SecondsPath": "$.duration",
-              "Type": "Wait"
             }
           }
         },
         "RoleArn": {
-          "Fn::GetAtt": ["TEAMGrantSMRole", "Arn"]
+          "Fn::GetAtt": [
+            "TEAMGrantSMRole",
+            "Arn"
+          ]
         },
         "LoggingConfiguration": {
           "Destinations": [
             {
               "CloudWatchLogsLogGroup": {
                 "LogGroupArn": {
-                  "Fn::GetAtt": ["TEAMStateMachineLogGroup", "Arn"]
+                  "Fn::GetAtt": [
+                    "TEAMStateMachineLogGroup",
+                    "Arn"
+                  ]
                 }
               }
             }
@@ -328,14 +388,20 @@
           }
         },
         "RoleArn": {
-          "Fn::GetAtt": ["TEAMScheduleSMRole", "Arn"]
+          "Fn::GetAtt": [
+            "TEAMScheduleSMRole",
+            "Arn"
+          ]
         },
         "LoggingConfiguration": {
           "Destinations": [
             {
               "CloudWatchLogsLogGroup": {
                 "LogGroupArn": {
-                  "Fn::GetAtt": ["TEAMStateMachineLogGroup", "Arn"]
+                  "Fn::GetAtt": [
+                    "TEAMStateMachineLogGroup",
+                    "Arn"
+                  ]
                 }
               }
             }
@@ -451,14 +517,20 @@
           }
         },
         "RoleArn": {
-          "Fn::GetAtt": ["TEAMRejectSMRole", "Arn"]
+          "Fn::GetAtt": [
+            "TEAMRejectSMRole",
+            "Arn"
+          ]
         },
         "LoggingConfiguration": {
           "Destinations": [
             {
               "CloudWatchLogsLogGroup": {
                 "LogGroupArn": {
-                  "Fn::GetAtt": ["TEAMStateMachineLogGroup", "Arn"]
+                  "Fn::GetAtt": [
+                    "TEAMStateMachineLogGroup",
+                    "Arn"
+                  ]
                 }
               }
             }
@@ -615,7 +687,12 @@
               "ResultPath": "$.revoke",
               "Retry": [
                 {
-                  "ErrorEquals": ["SsoAdmin.ThrottlingException", "ThrottlingException", "ServiceUnavailable", "InternalServerError"],
+                  "ErrorEquals": [
+                    "SsoAdmin.ThrottlingException",
+                    "ThrottlingException",
+                    "ServiceUnavailable",
+                    "InternalServerError"
+                  ],
                   "IntervalSeconds": 3,
                   "BackoffRate": 2,
                   "MaxAttempts": 5
@@ -650,7 +727,7 @@
                   "Next": "Pass"
                 }
               ],
-              "Default": "Revoke Permission",
+              "Default": "CheckRevokeType",
               "Type": "Choice"
             },
             "Update Request Status": {
@@ -675,18 +752,46 @@
                 }
               ],
               "Type": "Task"
+            },
+            "CheckRevokeType": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.isMultiTenant",
+                  "BooleanEquals": true,
+                  "Next": "MultiTenantRevoke"
+                }
+              ],
+              "Default": "Revoke Permission"
+            },
+            "MultiTenantRevoke": {
+              "Type": "Pass",
+              "Comment": "For multi-tenant, STS credentials auto-expire. Just update status.",
+              "Result": {
+                "AccountAssignmentDeletionStatus": {
+                  "Status": "IN_PROGRESS"
+                }
+              },
+              "ResultPath": "$.revoke",
+              "Next": "Notify Requester Session Ended"
             }
           }
         },
         "RoleArn": {
-          "Fn::GetAtt": ["TEAMRevokeSMRole", "Arn"]
+          "Fn::GetAtt": [
+            "TEAMRevokeSMRole",
+            "Arn"
+          ]
         },
         "LoggingConfiguration": {
           "Destinations": [
             {
               "CloudWatchLogsLogGroup": {
                 "LogGroupArn": {
-                  "Fn::GetAtt": ["TEAMStateMachineLogGroup", "Arn"]
+                  "Fn::GetAtt": [
+                    "TEAMStateMachineLogGroup",
+                    "Arn"
+                  ]
                 }
               }
             }
@@ -821,14 +926,20 @@
           }
         },
         "RoleArn": {
-          "Fn::GetAtt": ["TEAMApproveSMRole", "Arn"]
+          "Fn::GetAtt": [
+            "TEAMApproveSMRole",
+            "Arn"
+          ]
         },
         "LoggingConfiguration": {
           "Destinations": [
             {
               "CloudWatchLogsLogGroup": {
                 "LogGroupArn": {
-                  "Fn::GetAtt": ["TEAMStateMachineLogGroup", "Arn"]
+                  "Fn::GetAtt": [
+                    "TEAMStateMachineLogGroup",
+                    "Arn"
+                  ]
                 }
               }
             }
@@ -850,9 +961,13 @@
             {
               "Effect": "Allow",
               "Principal": {
-                "Service": ["states.amazonaws.com"]
+                "Service": [
+                  "states.amazonaws.com"
+                ]
               },
-              "Action": ["sts:AssumeRole"]
+              "Action": [
+                "sts:AssumeRole"
+              ]
             }
           ]
         },
@@ -891,21 +1006,28 @@
                 },
                 {
                   "Effect": "Allow",
-                  "Action": ["lambda:InvokeFunction"],
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
                   "Resource": {
                     "Ref": "functionteamNotificationsArn"
                   }
                 },
                 {
                   "Effect": "Allow",
-                  "Action": ["dynamodb:UpdateItem", "dynamodb:GetItem"],
+                  "Action": [
+                    "dynamodb:UpdateItem",
+                    "dynamodb:GetItem"
+                  ],
                   "Resource": {
                     "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/requests*"
                   }
                 },
                 {
                   "Effect": "Allow",
-                  "Action": ["lambda:InvokeFunction"],
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
                   "Resource": {
                     "Ref": "functionteamStatusArn"
                   }
@@ -925,9 +1047,13 @@
             {
               "Effect": "Allow",
               "Principal": {
-                "Service": ["states.amazonaws.com"]
+                "Service": [
+                  "states.amazonaws.com"
+                ]
               },
-              "Action": ["sts:AssumeRole"]
+              "Action": [
+                "sts:AssumeRole"
+              ]
             }
           ]
         },
@@ -979,14 +1105,19 @@
                 },
                 {
                   "Effect": "Allow",
-                  "Action": ["lambda:InvokeFunction"],
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
                   "Resource": {
                     "Ref": "functionteamNotificationsArn"
                   }
                 },
                 {
                   "Effect": "Allow",
-                  "Action": ["dynamodb:UpdateItem", "dynamodb:GetItem"],
+                  "Action": [
+                    "dynamodb:UpdateItem",
+                    "dynamodb:GetItem"
+                  ],
                   "Resource": {
                     "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/requests*"
                   }
@@ -1000,7 +1131,9 @@
                 },
                 {
                   "Effect": "Allow",
-                  "Action": ["lambda:InvokeFunction"],
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
                   "Resource": {
                     "Ref": "functionteamStatusArn"
                   }
@@ -1020,9 +1153,13 @@
             {
               "Effect": "Allow",
               "Principal": {
-                "Service": ["states.amazonaws.com"]
+                "Service": [
+                  "states.amazonaws.com"
+                ]
               },
-              "Action": ["sts:AssumeRole"]
+              "Action": [
+                "sts:AssumeRole"
+              ]
             }
           ]
         },
@@ -1062,19 +1199,25 @@
                 },
                 {
                   "Effect": "Allow",
-                  "Action": ["lambda:InvokeFunction"],
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
                   "Resource": {
                     "Ref": "functionteamNotificationsArn"
                   }
                 },
                 {
                   "Effect": "Allow",
-                  "Action": ["sso:CreateAccountAssignment"],
+                  "Action": [
+                    "sso:CreateAccountAssignment"
+                  ],
                   "Resource": "*"
                 },
                 {
                   "Effect": "Allow",
-                  "Action": ["dynamodb:UpdateItem"],
+                  "Action": [
+                    "dynamodb:UpdateItem"
+                  ],
                   "Resource": {
                     "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/requests*"
                   }
@@ -1101,9 +1244,20 @@
                 },
                 {
                   "Effect": "Allow",
-                  "Action": ["lambda:InvokeFunction"],
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
                   "Resource": {
                     "Ref": "functionteamStatusArn"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
+                  "Resource": {
+                    "Ref": "functionteamMultiTenantGrantArn"
                   }
                 }
               ]
@@ -1121,9 +1275,13 @@
             {
               "Effect": "Allow",
               "Principal": {
-                "Service": ["states.amazonaws.com"]
+                "Service": [
+                  "states.amazonaws.com"
+                ]
               },
-              "Action": ["sts:AssumeRole"]
+              "Action": [
+                "sts:AssumeRole"
+              ]
             }
           ]
         },
@@ -1162,19 +1320,26 @@
                 },
                 {
                   "Effect": "Allow",
-                  "Action": ["lambda:InvokeFunction"],
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
                   "Resource": {
                     "Ref": "functionteamNotificationsArn"
                   }
                 },
                 {
                   "Effect": "Allow",
-                  "Action": ["sso:DeleteAccountAssignment"],
+                  "Action": [
+                    "sso:DeleteAccountAssignment"
+                  ],
                   "Resource": "*"
                 },
                 {
                   "Effect": "Allow",
-                  "Action": ["dynamodb:UpdateItem", "dynamodb:GetItem"],
+                  "Action": [
+                    "dynamodb:UpdateItem",
+                    "dynamodb:GetItem"
+                  ],
                   "Resource": {
                     "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/requests*"
                   }
@@ -1192,7 +1357,9 @@
                 },
                 {
                   "Effect": "Allow",
-                  "Action": ["lambda:InvokeFunction"],
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
                   "Resource": {
                     "Ref": "functionteamStatusArn"
                   }
@@ -1212,9 +1379,13 @@
             {
               "Effect": "Allow",
               "Principal": {
-                "Service": ["states.amazonaws.com"]
+                "Service": [
+                  "states.amazonaws.com"
+                ]
               },
-              "Action": ["sts:AssumeRole"]
+              "Action": [
+                "sts:AssumeRole"
+              ]
             }
           ]
         },
@@ -1253,14 +1424,18 @@
                 },
                 {
                   "Effect": "Allow",
-                  "Action": ["lambda:InvokeFunction"],
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
                   "Resource": {
                     "Ref": "functionteamNotificationsArn"
                   }
                 },
                 {
                   "Effect": "Allow",
-                  "Action": ["lambda:InvokeFunction"],
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
                   "Resource": {
                     "Ref": "functionteamStatusArn"
                   }
@@ -1278,7 +1453,10 @@
           "Fn::Sub": "/aws/stepfunction/team-step-function/${env}"
         },
         "KmsKeyId": {
-          "Fn::GetAtt": ["LogGroupKey", "Arn"]
+          "Fn::GetAtt": [
+            "LogGroupKey",
+            "Arn"
+          ]
         },
         "RetentionInDays": 14
       }
