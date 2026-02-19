@@ -273,7 +273,7 @@
           }
         ]
       },
-      "DependsOn": "LambdaExecutionRole"
+      "DependsOn": ["LambdaExecutionRole"]
     }
   },
   "Outputs": {
