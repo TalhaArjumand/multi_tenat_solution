@@ -1,4 +1,4 @@
 {
-  "Login": "sso login URL",
-  "DeploymentType": "deployment type"
+  "Login": "https://ssoins-7223afa5ccc151fe.portal.us-east-1.app.aws",
+  "DeploymentType": "delegated"
 }

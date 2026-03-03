@@ -150,11 +150,6 @@
             "SSO_LOGIN_URL": {
               "Ref": "SSOLoginUrl"
             },
-            "APPROVER_TABLE_NAME": {
-              "Fn::ImportValue": {
-                "Fn::Sub": "${apiteamGraphQLAPIIdOutput}:GetAtt:ApproversTable:Name"
-              }
-            },
             "REQUESTS_TABLE_NAME": {
               "Fn::ImportValue": {
                 "Fn::Sub": "${apiteamGraphQLAPIIdOutput}:GetAtt:requestsTable:Name"
@@ -172,7 +167,11 @@
             "FN_TEAMNOTIFICATIONS_ARN": {
               "Ref": "functionteamNotificationsArn"
             },
-            "CUSTOMERS_TABLE_NAME": "Customers-aulamfydfvg5fmjl4uboxne7du-main"
+            "CUSTOMERS_TABLE_NAME": {
+              "Fn::ImportValue": {
+                "Fn::Sub": "${apiteamGraphQLAPIIdOutput}:GetAtt:CustomersTable:Name"
+              }
+            }
           }
         },
         "Role": {
@@ -298,15 +297,6 @@
                   "Ref": "customstepfunctionsApprovalSMOutput"
                 }
               ]
-            },
-            {
-              "Effect": "Allow",
-              "Action": [
-                "dynamodb:GetItem"
-              ],
-              "Resource": {
-                "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Approvers-*"
-              }
             },
             {
               "Effect": "Allow",

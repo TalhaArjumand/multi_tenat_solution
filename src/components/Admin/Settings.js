@@ -38,6 +38,7 @@ function Settings(props) {
   const [comments, setComments] = useState(null);
   const [ticketNo, setTicketNo] = useState(null);
   const [approval, setApproval] = useState(null);
+  const [activationMode, setActivationMode] = useState("immediate");
   const [sesNotificationsEnabled, setSesNotificationsEnabled] = useState(null);
   const [snsNotificationsEnabled, setSnsNotificationsEnabled] = useState(null);
   const [slackNotificationsEnabled, setSlackNotificationsEnabled] =
@@ -172,6 +173,7 @@ function Settings(props) {
       setComments(item.comments ?? true);
       setTicketNo(item.ticketNo ?? true);
       setApproval(item.approval ?? true);
+      setActivationMode(item.activationMode ?? "immediate");
       setSesNotificationsEnabled(item.sesNotificationsEnabled ?? false);
       setSnsNotificationsEnabled(item.snsNotificationsEnabled ?? false);
       setSlackNotificationsEnabled(item.slackNotificationsEnabled ?? false);
@@ -193,6 +195,7 @@ function Settings(props) {
         comments,
         ticketNo,
         approval,
+        activationMode,
         sesNotificationsEnabled,
         snsNotificationsEnabled,
         slackNotificationsEnabled,
@@ -226,6 +229,7 @@ function Settings(props) {
       setComments(data?.comments ?? true);
       setTicketNo(data?.ticketNo ?? true);
       setApproval(data?.approval ?? true);
+      setActivationMode(data?.activationMode ?? "immediate");
       setSesNotificationsEnabled(data?.sesNotificationsEnabled ?? false);
       setSnsNotificationsEnabled(data?.snsNotificationsEnabled ?? false);
       setSlackNotificationsEnabled(data?.slackNotificationsEnabled ?? false);
@@ -275,6 +279,24 @@ function Settings(props) {
                         type={approval === true ? "success" : "stopped"}
                       >
                         {approval === true ? "Enabled (Managed in eligibility policy)" : "Disabled"}
+                      </StatusIndicator>
+                    </div>
+                  ) : (
+                    <Spinner />
+                  )}
+                </>
+              </div>
+              <div>
+                <Box variant="awsui-key-label">Activation mode</Box>
+                <>
+                  {activationMode !== null ? (
+                    <div>
+                      <StatusIndicator
+                        type={activationMode === "scheduled" ? "warning" : "success"}
+                      >
+                        {activationMode === "scheduled"
+                          ? "Scheduled (activate at start time)"
+                          : "Immediate (activate on approval)"}
                       </StatusIndicator>
                     </div>
                   ) : (
@@ -571,6 +593,40 @@ function Settings(props) {
                   >
                     {approval ? "Enabled" : "Disabled"}
                   </Toggle>
+                </FormField>
+                <br />
+                <FormField
+                  label="Activation mode"
+                  stretch
+                  description="Choose whether approved requests activate immediately or at the configured start time."
+                >
+                  <Select
+                    selectedOption={{
+                      label:
+                        activationMode === "scheduled"
+                          ? "Scheduled at start time"
+                          : "Immediate on approval",
+                      value: activationMode,
+                    }}
+                    options={[
+                      {
+                        label: "Immediate on approval",
+                        value: "immediate",
+                        description:
+                          "Phase 1 mode. Account assignment is created right after approval.",
+                      },
+                      {
+                        label: "Scheduled at start time",
+                        value: "scheduled",
+                        description:
+                          "Phase 2 mode. Assignment is created when start time is reached.",
+                      },
+                    ]}
+                    onChange={({ detail }) =>
+                      setActivationMode(detail.selectedOption.value)
+                    }
+                    selectedAriaLabel="selected"
+                  />
                 </FormField>
                 <br />
                 <FormField

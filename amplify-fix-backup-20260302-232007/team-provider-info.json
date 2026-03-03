@@ -1,0 +1,21 @@
+{
+  "main": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-teamidcapp-main-9732b-authRole",
+      "UnauthRoleArn": "arn:aws:iam::722560225075:role/amplify-teamidcapp-main-9732b-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::722560225075:role/amplify-teamidcapp-main-9732b-authRole",
+      "Region": "us-east-1",
+      "DeploymentBucketName": "amplify-teamidcapp-main-9732b-deployment",
+      "UnauthRoleName": "amplify-teamidcapp-main-9732b-unauthRole",
+      "StackName": "amplify-teamidcapp-main-9732b",
+      "StackId": "arn:aws:cloudformation:us-east-1:722560225075:stack/amplify-teamidcapp-main-9732b/0d5f9d60-feae-11f0-a768-12bc9bff0e07",
+      "AmplifyAppId": "d13k6ou0ossrku",
+      "AuthTriggerTemplateURL": "https://s3.amazonaws.com/amplify-teamidcapp-main-9732b-deployment/amplify-cfn-templates/auth/auth-trigger-cloudformation-template.json"
+    },
+    "categories": {
+      "auth": {
+        "team06dbb7fc": {}
+      }
+    }
+  }
+}

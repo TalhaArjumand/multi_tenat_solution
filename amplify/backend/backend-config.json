@@ -151,6 +151,53 @@
       "providerPlugin": "awscloudformation",
       "service": "Lambda"
     },
+    "teamApproveInvitation": {
+      "build": true,
+      "dependsOn": [
+        {
+          "attributes": [
+            "GraphQLAPIIdOutput",
+            "GraphQLAPIEndpointOutput"
+          ],
+          "category": "api",
+          "resourceName": "team"
+        },
+        {
+          "attributes": [
+            "Name"
+          ],
+          "category": "function",
+          "resourceName": "teamGenerateCloudFormation"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
+    "teamGenerateCloudFormation": {
+      "build": true,
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
+    "teamGetInvitationDetails": {
+      "build": true,
+      "dependsOn": [
+        {
+          "attributes": [
+            "GraphQLAPIIdOutput",
+            "GraphQLAPIEndpointOutput"
+          ],
+          "category": "api",
+          "resourceName": "team"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
+    "teamGetMultiTenantCredentials": {
+      "build": true,
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
     "teamGetPermissionSets": {
       "build": true,
       "dependsOn": [
@@ -180,6 +227,11 @@
       "providerPlugin": "awscloudformation",
       "service": "Lambda"
     },
+    "teamMultiTenantGrant": {
+      "build": true,
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
     "teamNotifications": {
       "build": true,
       "dependsOn": [
@@ -195,6 +247,21 @@
       "service": "Lambda"
     },
     "teamPublishOUs": {
+      "build": true,
+      "dependsOn": [
+        {
+          "attributes": [
+            "GraphQLAPIIdOutput",
+            "GraphQLAPIEndpointOutput"
+          ],
+          "category": "api",
+          "resourceName": "team"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
+    "teamRejectInvitation": {
       "build": true,
       "dependsOn": [
         {
@@ -256,7 +323,37 @@
       "providerPlugin": "awscloudformation",
       "service": "Lambda"
     },
+    "teamSendCustomerInvitation": {
+      "build": true,
+      "dependsOn": [
+        {
+          "attributes": [
+            "GraphQLAPIIdOutput",
+            "GraphQLAPIEndpointOutput"
+          ],
+          "category": "api",
+          "resourceName": "team"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
     "teamStatus": {
+      "build": true,
+      "dependsOn": [
+        {
+          "attributes": [
+            "GraphQLAPIIdOutput",
+            "GraphQLAPIEndpointOutput"
+          ],
+          "category": "api",
+          "resourceName": "team"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
+    "teamVerifyCustomerRole": {
       "build": true,
       "dependsOn": [
         {
@@ -403,103 +500,6 @@
       ],
       "providerPlugin": "awscloudformation",
       "service": "Lambda"
-    },
-    "teamGenerateCloudFormation": {
-      "build": true,
-      "providerPlugin": "awscloudformation",
-      "service": "Lambda"
-    },
-    "teamVerifyCustomerRole": {
-      "build": true,
-      "dependsOn": [
-        {
-          "attributes": [
-            "GraphQLAPIIdOutput",
-            "GraphQLAPIEndpointOutput"
-          ],
-          "category": "api",
-          "resourceName": "team"
-        }
-      ],
-      "providerPlugin": "awscloudformation",
-      "service": "Lambda"
-    },
-    "teamSendCustomerInvitation": {
-      "build": true,
-      "dependsOn": [
-        {
-          "attributes": [
-            "GraphQLAPIIdOutput",
-            "GraphQLAPIEndpointOutput"
-          ],
-          "category": "api",
-          "resourceName": "team"
-        }
-      ],
-      "providerPlugin": "awscloudformation",
-      "service": "Lambda"
-    },
-    "teamGetInvitationDetails": {
-      "build": true,
-      "dependsOn": [
-        {
-          "attributes": [
-            "GraphQLAPIIdOutput",
-            "GraphQLAPIEndpointOutput"
-          ],
-          "category": "api",
-          "resourceName": "team"
-        }
-      ],
-      "providerPlugin": "awscloudformation",
-      "service": "Lambda"
-    },
-    "teamApproveInvitation": {
-      "build": true,
-      "dependsOn": [
-        {
-          "attributes": [
-            "GraphQLAPIIdOutput",
-            "GraphQLAPIEndpointOutput"
-          ],
-          "category": "api",
-          "resourceName": "team"
-        },
-        {
-          "attributes": [
-            "Name"
-          ],
-          "category": "function",
-          "resourceName": "teamGenerateCloudFormation"
-        }
-      ],
-      "providerPlugin": "awscloudformation",
-      "service": "Lambda"
-    },
-    "teamRejectInvitation": {
-      "build": true,
-      "dependsOn": [
-        {
-          "attributes": [
-            "GraphQLAPIIdOutput",
-            "GraphQLAPIEndpointOutput"
-          ],
-          "category": "api",
-          "resourceName": "team"
-        }
-      ],
-      "providerPlugin": "awscloudformation",
-      "service": "Lambda"
-    },
-    "teamMultiTenantGrant": {
-      "build": true,
-      "providerPlugin": "awscloudformation",
-      "service": "Lambda"
-    },
-    "teamGetMultiTenantCredentials": {
-      "build": true,
-      "providerPlugin": "awscloudformation",
-      "service": "Lambda"
     }
   },
   "hosting": {
@@ -507,456 +507,6 @@
       "providerPlugin": "awscloudformation",
       "service": "amplifyhosting",
       "type": "manual"
-    }
-  },
-  "parameters": {
-    "AMPLIFY_function_team06dbb7fcPreTokenGeneration_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "team06dbb7fcPreTokenGeneration"
-        }
-      ]
-    },
-    "AMPLIFY_function_team06dbb7fcPreTokenGeneration_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "team06dbb7fcPreTokenGeneration"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamGetPermissionSets_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamGetPermissionSets"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamGetPermissionSets_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamGetPermissionSets"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamListGroups_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamListGroups"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamListGroups_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamListGroups"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamNotifications_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamNotifications"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamNotifications_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamNotifications"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamPublishOUs_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamPublishOUs"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamPublishOUs_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamPublishOUs"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamRouter_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamRouter"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamRouter_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamRouter"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamStatus_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamStatus"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamStatus_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamStatus"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamapplicationboto3layer_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamapplicationboto3layer"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamapplicationboto3layer_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamapplicationboto3layer"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamgetAccounts_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamgetAccounts"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamgetAccounts_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamgetAccounts"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamgetEntitlement_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamgetEntitlement"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamgetEntitlement_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamgetEntitlement"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamgetIdCGroups_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamgetIdCGroups"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamgetIdCGroups_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamgetIdCGroups"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamgetLogs_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamgetLogs"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamgetLogs_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamgetLogs"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamgetMgmtAccountDetails_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamgetMgmtAccountDetails"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamgetMgmtAccountDetails_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamgetMgmtAccountDetails"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamgetOU_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamgetOU"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamgetOU_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamgetOU"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamgetOUs_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamgetOUs"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamgetOUs_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamgetOUs"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamgetPermissions_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamgetPermissions"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamgetPermissions_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamgetPermissions"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamgetUserPolicy_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamgetUserPolicy"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamgetUserPolicy_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamgetUserPolicy"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamgetUsers_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamgetUsers"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamgetUsers_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamgetUsers"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamqueryLogs_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamqueryLogs"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamqueryLogs_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamqueryLogs"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamGenerateCloudFormation_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamGenerateCloudFormation"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamGenerateCloudFormation_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamGenerateCloudFormation"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamVerifyCustomerRole_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamVerifyCustomerRole"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamVerifyCustomerRole_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamVerifyCustomerRole"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamSendCustomerInvitation_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamSendCustomerInvitation"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamSendCustomerInvitation_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamSendCustomerInvitation"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamGetInvitationDetails_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamGetInvitationDetails"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamGetInvitationDetails_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamGetInvitationDetails"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamApproveInvitation_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamApproveInvitation"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamApproveInvitation_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamApproveInvitation"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamRejectInvitation_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamRejectInvitation"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamRejectInvitation_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamRejectInvitation"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamMultiTenantGrant_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamMultiTenantGrant"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamMultiTenantGrant_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamMultiTenantGrant"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamGetMultiTenantCredentials_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamGetMultiTenantCredentials"
-        }
-      ]
-    },
-    "AMPLIFY_function_teamGetMultiTenantCredentials_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "teamGetMultiTenantCredentials"
-        }
-      ]
-    },
-    "AMPLIFY_hosting_amplifyhosting_appId": {
-      "usedBy": [
-        {
-          "category": "hosting",
-          "resourceName": "amplifyhosting"
-        }
-      ]
-    },
-    "AMPLIFY_hosting_amplifyhosting_type": {
-      "usedBy": [
-        {
-          "category": "hosting",
-          "resourceName": "amplifyhosting"
-        }
-      ]
     }
   }
 }

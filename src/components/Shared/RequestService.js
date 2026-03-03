@@ -253,7 +253,8 @@ export async function requestTeam(data) {
     );
     return req.data.createRequests.id;
   } catch (err) {
-    console.log("error creating request");
+    console.log("error creating request", err);
+    throw err;
   }
 }
 export async function getSessionLogs(data) {

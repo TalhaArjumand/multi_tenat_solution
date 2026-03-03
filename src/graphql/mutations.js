@@ -31,6 +31,13 @@ export const createRequests = /* GraphQL */ `
       session_duration
       customerId
       customerName
+      assignmentPrincipalId
+      assignmentPrincipalType
+      assignmentRequestId
+      activationError
+      activationStartedAt
+      activationCompletedAt
+      revocationCompletedAt
       createdAt
       updatedAt
       owner
@@ -68,6 +75,13 @@ export const updateRequests = /* GraphQL */ `
       session_duration
       customerId
       customerName
+      assignmentPrincipalId
+      assignmentPrincipalType
+      assignmentRequestId
+      activationError
+      activationStartedAt
+      activationCompletedAt
+      revocationCompletedAt
       createdAt
       updatedAt
       owner
@@ -105,6 +119,13 @@ export const deleteRequests = /* GraphQL */ `
       session_duration
       customerId
       customerName
+      assignmentPrincipalId
+      assignmentPrincipalType
+      assignmentRequestId
+      activationError
+      activationStartedAt
+      activationCompletedAt
+      revocationCompletedAt
       createdAt
       updatedAt
       owner
@@ -127,6 +148,8 @@ export const createSessions = /* GraphQL */ `
       approver_ids
       queryId
       expireAt
+      customerId
+      customerName
       createdAt
       updatedAt
       owner
@@ -149,6 +172,8 @@ export const updateSessions = /* GraphQL */ `
       approver_ids
       queryId
       expireAt
+      customerId
+      customerName
       createdAt
       updatedAt
       owner
@@ -171,6 +196,8 @@ export const deleteSessions = /* GraphQL */ `
       approver_ids
       queryId
       expireAt
+      customerId
+      customerName
       createdAt
       updatedAt
       owner
@@ -191,6 +218,8 @@ export const createApprovers = /* GraphQL */ `
       groupIds
       ticketNo
       modifiedBy
+      customerId
+      customerName
       createdAt
       updatedAt
       __typename
@@ -210,6 +239,8 @@ export const updateApprovers = /* GraphQL */ `
       groupIds
       ticketNo
       modifiedBy
+      customerId
+      customerName
       createdAt
       updatedAt
       __typename
@@ -229,6 +260,8 @@ export const deleteApprovers = /* GraphQL */ `
       groupIds
       ticketNo
       modifiedBy
+      customerId
+      customerName
       createdAt
       updatedAt
       __typename
@@ -257,6 +290,8 @@ export const createSettings = /* GraphQL */ `
       slackToken
       teamAdminGroup
       teamAuditorGroup
+      teamCustomerAdminGroup
+      activationMode
       createdAt
       updatedAt
       __typename
@@ -285,6 +320,8 @@ export const updateSettings = /* GraphQL */ `
       slackToken
       teamAdminGroup
       teamAuditorGroup
+      teamCustomerAdminGroup
+      activationMode
       createdAt
       updatedAt
       __typename
@@ -313,7 +350,114 @@ export const deleteSettings = /* GraphQL */ `
       slackToken
       teamAdminGroup
       teamAuditorGroup
+      teamCustomerAdminGroup
+      activationMode
       createdAt
+      updatedAt
+      __typename
+    }
+  }
+`;
+export const createCustomers = /* GraphQL */ `
+  mutation CreateCustomers(
+    $input: CreateCustomersInput!
+    $condition: ModelCustomersConditionInput
+  ) {
+    createCustomers(input: $input, condition: $condition) {
+      id
+      name
+      description
+      accountIds
+      approverGroupIds
+      adminEmail
+      adminName
+      status
+      settings
+      createdAt
+      modifiedBy
+      metadata
+      permissionSet
+      roleStatus
+      roleArn
+      externalId
+      cloudFormationTemplate
+      invitationToken
+      invitationSentAt
+      invitationExpiresAt
+      approvedAt
+      roleEstablishedAt
+      lastRoleVerification
+      roleVerificationError
+      updatedAt
+      __typename
+    }
+  }
+`;
+export const updateCustomers = /* GraphQL */ `
+  mutation UpdateCustomers(
+    $input: UpdateCustomersInput!
+    $condition: ModelCustomersConditionInput
+  ) {
+    updateCustomers(input: $input, condition: $condition) {
+      id
+      name
+      description
+      accountIds
+      approverGroupIds
+      adminEmail
+      adminName
+      status
+      settings
+      createdAt
+      modifiedBy
+      metadata
+      permissionSet
+      roleStatus
+      roleArn
+      externalId
+      cloudFormationTemplate
+      invitationToken
+      invitationSentAt
+      invitationExpiresAt
+      approvedAt
+      roleEstablishedAt
+      lastRoleVerification
+      roleVerificationError
+      updatedAt
+      __typename
+    }
+  }
+`;
+export const deleteCustomers = /* GraphQL */ `
+  mutation DeleteCustomers(
+    $input: DeleteCustomersInput!
+    $condition: ModelCustomersConditionInput
+  ) {
+    deleteCustomers(input: $input, condition: $condition) {
+      id
+      name
+      description
+      accountIds
+      approverGroupIds
+      adminEmail
+      adminName
+      status
+      settings
+      createdAt
+      modifiedBy
+      metadata
+      permissionSet
+      roleStatus
+      roleArn
+      externalId
+      cloudFormationTemplate
+      invitationToken
+      invitationSentAt
+      invitationExpiresAt
+      approvedAt
+      roleEstablishedAt
+      lastRoleVerification
+      roleVerificationError
       updatedAt
       __typename
     }
@@ -331,22 +475,30 @@ export const createEligibility = /* GraphQL */ `
       accounts {
         name
         id
+        customerId
+        customerName
         __typename
       }
       ous {
         name
         id
+        customerId
+        customerName
         __typename
       }
       permissions {
         name
         id
+        customerId
+        customerName
         __typename
       }
       ticketNo
       approvalRequired
       duration
       modifiedBy
+      customerId
+      customerName
       createdAt
       updatedAt
       __typename
@@ -365,22 +517,30 @@ export const updateEligibility = /* GraphQL */ `
       accounts {
         name
         id
+        customerId
+        customerName
         __typename
       }
       ous {
         name
         id
+        customerId
+        customerName
         __typename
       }
       permissions {
         name
         id
+        customerId
+        customerName
         __typename
       }
       ticketNo
       approvalRequired
       duration
       modifiedBy
+      customerId
+      customerName
       createdAt
       updatedAt
       __typename
@@ -399,22 +559,30 @@ export const deleteEligibility = /* GraphQL */ `
       accounts {
         name
         id
+        customerId
+        customerName
         __typename
       }
       ous {
         name
         id
+        customerId
+        customerName
         __typename
       }
       permissions {
         name
         id
+        customerId
+        customerName
         __typename
       }
       ticketNo
       approvalRequired
       duration
       modifiedBy
+      customerId
+      customerName
       createdAt
       updatedAt
       __typename
@@ -453,101 +621,6 @@ export const publishPermissions = /* GraphQL */ `
         Duration
         __typename
       }
-      __typename
-    }
-  }
-`;
-export const createCustomers = /* GraphQL */ `
-  mutation CreateCustomers(
-    $input: CreateCustomersInput!
-    $condition: ModelCustomersConditionInput
-  ) {
-    createCustomers(input: $input, condition: $condition) {
-      id
-      name
-      description
-      accountIds
-      approverGroupIds
-      adminEmail
-      adminName
-      status
-      settings
-      createdAt
-      modifiedBy
-      metadata
-      permissionSet
-      roleStatus
-      roleArn
-      externalId
-      cloudFormationTemplate
-      invitationToken
-      invitationSentAt
-      invitationExpiresAt
-      approvedAt
-      roleEstablishedAt
-      lastRoleVerification
-      roleVerificationError
-      __typename
-    }
-  }
-`;
-export const updateCustomers = /* GraphQL */ `
-  mutation UpdateCustomers(
-    $input: UpdateCustomersInput!
-    $condition: ModelCustomersConditionInput
-  ) {
-    updateCustomers(input: $input, condition: $condition) {
-      id
-      name
-      description
-      accountIds
-      approverGroupIds
-      adminEmail
-      adminName
-      status
-      settings
-      createdAt
-      modifiedBy
-      metadata
-      permissionSet
-      roleStatus
-      roleArn
-      externalId
-      cloudFormationTemplate
-      invitationToken
-      invitationSentAt
-      invitationExpiresAt
-      approvedAt
-      roleEstablishedAt
-      lastRoleVerification
-      roleVerificationError
-      __typename
-    }
-  }
-`;
-export const deleteCustomers = /* GraphQL */ `
-  mutation DeleteCustomers(
-    $input: DeleteCustomersInput!
-    $condition: ModelCustomersConditionInput
-  ) {
-    deleteCustomers(input: $input, condition: $condition) {
-      id
-      name
-      description
-      accountIds
-      approverGroupIds
-      adminEmail
-      adminName
-      status
-      settings
-      createdAt
-      modifiedBy
-      metadata
-      permissionSet
-      roleStatus
-      roleArn
-      externalId
-      invitationToken
       __typename
     }
   }

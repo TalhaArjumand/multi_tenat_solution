@@ -206,7 +206,7 @@
           }
         ]
       },
-      "DependsOn": ["LambdaExecutionRole"]
+      "DependsOn": "LambdaExecutionRole"
     },
     "AmplifyResourcesPolicy": {
       "DependsOn": [
