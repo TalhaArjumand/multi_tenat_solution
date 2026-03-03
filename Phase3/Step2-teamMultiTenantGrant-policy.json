@@ -1,0 +1,22 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Action": "sts:AssumeRole",
+        "Resource": "arn:aws:iam::*:role/CloudIQS-MSP-AccessRole"
+      },
+      {
+        "Effect": "Allow",
+        "Action": [
+          "dynamodb:Scan",
+          "dynamodb:GetItem",
+          "dynamodb:Query"
+        ],
+        "Resource": [
+          "arn:aws:dynamodb:*:*:table/Customers-*",
+          "arn:aws:dynamodb:*:*:table/Customers-*/index/*"
+        ]
+      }
+    ]
+  }
