@@ -14,7 +14,7 @@ import Textarea from "@awsui/components-react/textarea";
 import moment from "moment";
 import { DatePicker } from "antd";
 import "../../index.css";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   getGroupMemberships,
   requestTeam,
@@ -72,6 +72,8 @@ function Request(props) {
   const [customers, setCustomers] = useState([]);
   const [customersLoading, setCustomersLoading] = useState(true);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const policyRequestIdRef = useRef(null);
+  const policyUsernameRef = useRef("");
 
   const history = useHistory();
   
@@ -147,17 +149,31 @@ function Request(props) {
       groupIds: props.groupIds,
     };
     const data = await fetchPolicy(args);
+    policyRequestIdRef.current = data?.id || null;
+    policyUsernameRef.current = (data?.username || "").toLowerCase();
     applyPolicyData(data?.policy);
   };
 
   function publishEvent() {
     const subscription = API.graphql(graphqlOperation(onPublishPolicy)).subscribe({
       next: (result) => {
-        console.log("SUBSCRIPTION received:", JSON.stringify(result.value.data.onPublishPolicy, null, 2));
-        const policy = result.value.data.onPublishPolicy.policy;
-        if (policy?.length > 0) {
-          applyPolicyData(policy);
+        const payload = result?.value?.data?.onPublishPolicy;
+        console.log("SUBSCRIPTION received:", JSON.stringify(payload, null, 2));
+        if (!payload) return;
+
+        // Ignore unrelated policy broadcasts. onPublishPolicy is global,
+        // so we must correlate by both request id and username.
+        if (!policyRequestIdRef.current || !policyUsernameRef.current) return;
+        const eventUsername = (payload.username || "").toLowerCase();
+        if (
+          payload.id !== policyRequestIdRef.current ||
+          eventUsername !== policyUsernameRef.current
+        ) {
+          return;
         }
+
+        const policy = payload.policy;
+        if (policy?.length > 0) applyPolicyData(policy);
       },
       error: (error) => {
         console.warn("SUBSCRIPTION error:", error);
