@@ -193,7 +193,17 @@
                 "sns:Publish"
               ],
               "Resource": {
-                "Fn::ImportValue": "NotificationTopicArn"
+                "Fn::ImportValue": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "NotificationTopicArn-",
+                      {
+                        "Ref": "env"
+                      }
+                    ]
+                  ]
+                }
               }
             },
             {

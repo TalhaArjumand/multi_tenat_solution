@@ -127,7 +127,17 @@
               }
             },
             "NOTIFICATION_TOPIC_ARN": {
-              "Fn::ImportValue": "NotificationTopicArn"
+              "Fn::ImportValue": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "NotificationTopicArn-",
+                    {
+                      "Ref": "env"
+                    }
+                  ]
+                ]
+              }
             },
             "API_TEAM_GRAPHQLAPIENDPOINTOUTPUT": {
               "Ref": "apiteamGraphQLAPIEndpointOutput"

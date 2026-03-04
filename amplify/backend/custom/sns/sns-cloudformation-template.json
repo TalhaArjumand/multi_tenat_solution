@@ -32,7 +32,17 @@
         "Ref": "snsNotificationTopic"
       },
       "Export": {
-        "Name": "NotificationTopicArn"
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              "NotificationTopicArn-",
+              {
+                "Ref": "env"
+              }
+            ]
+          ]
+        }
       }
     }
   }
