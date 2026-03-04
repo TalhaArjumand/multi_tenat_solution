@@ -201,10 +201,10 @@ function Request(props) {
     try {
       const result = await API.graphql(graphqlOperation(listCustomers));
       const customerList = result.data.listCustomers.items || [];
-      // Only show active customers with established roles
+      // Only show customers with established roles — they have verified access
       const activeCustomers = customerList.filter(
         c => (c.status === 'active' || !c.status) && 
-             (c.roleStatus === 'established' || !c.roleStatus) // Allow legacy customers without roleStatus
+             c.roleStatus === 'established'
       );
       setCustomers(activeCustomers);
     } catch (error) {
@@ -222,14 +222,30 @@ function Request(props) {
       // Find the customer and get their accountIds
       const customer = customers.find(c => c.id === customerId);
       if (customer && customer.accountIds && customer.accountIds.length > 0) {
-        // Filter accounts by checking if account.id is in customer.accountIds
+        // First try to filter from allAccounts (accounts loaded from policy)
         const filtered = allAccounts.filter(acc => 
           customer.accountIds.includes(acc.id)
         );
-        setAccounts(filtered);
+
+        if (filtered.length > 0) {
+          setAccounts(filtered);
+        } else {
+          // Customer accounts are not in the SSO policy list
+          // Build account entries from customer data directly
+          // This handles multi-tenant external accounts that aren't in AWS Organizations
+          const customerAccounts = customer.accountIds.map(accountId => ({
+            name: `${customer.name} - ${accountId}`,
+            id: accountId,
+            customerId: customer.id,
+            customerName: customer.name
+          }));
+          setAccounts(customerAccounts);
+        }
+        setAccountStatus("finished");
       } else {
         // No accounts mapped to this customer
         setAccounts([]);
+        setAccountStatus("finished");
       }
     }
   }

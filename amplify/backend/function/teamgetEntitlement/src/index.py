@@ -14,6 +14,7 @@ dynamodb = boto3.resource("dynamodb")
 policy_table = dynamodb.Table(policy_table_name)
 
 ACCOUNT_ID = os.environ["ACCOUNT_ID"]
+DEFAULT_DURATION = "9"
 
 
 def get_mgmt_account_id():
@@ -121,6 +122,8 @@ def get_customers():
                     name
                     accountIds
                     status
+                    roleStatus
+                    permissionSet
                 }
             }
         }
@@ -149,6 +152,22 @@ def get_customers():
         print("Error fetching customers")
         print(exception)
         return []
+
+
+def get_customer_accounts(customers):
+    """Build account entries from multi-tenant customers with established roles"""
+    customer_accounts = []
+    for customer in customers:
+        if (customer.get("roleStatus") == "established" and
+            customer.get("accountIds")):
+            for account_id in customer["accountIds"]:
+                customer_accounts.append({
+                    "name": f"{customer['name']} - {account_id}",
+                    "id": account_id,
+                    "customerId": customer["id"],
+                    "customerName": customer["name"]
+                })
+    return customer_accounts
 
 
 def enrich_accounts_with_customer_info(accounts, customers):
@@ -211,6 +230,30 @@ def handler(event, context):
         policy["approvalRequired"] = entitlement["Item"]["approvalRequired"]
         policy["duration"] = str(maxDuration)
         eligibility.append(policy)
+
+    # Add multi-tenant customer accounts that are not in SSO eligibility
+    customer_accounts = get_customer_accounts(customers)
+    if customer_accounts:
+        existing_account_ids = set()
+        for policy in eligibility:
+            for acc in policy.get("accounts", []):
+                existing_account_ids.add(acc["id"])
+
+        new_customer_accounts = [
+            acc for acc in customer_accounts
+            if acc["id"] not in existing_account_ids
+        ]
+
+        if new_customer_accounts:
+            customer_policy = {
+                "accounts": new_customer_accounts,
+                "permissions": [],
+                "approvalRequired": False,
+                "duration": str(maxDuration) if maxDuration > 0 else DEFAULT_DURATION
+            }
+            eligibility.append(customer_policy)
+            print(f"Added {len(new_customer_accounts)} multi-tenant customer accounts")
+
     result = {"id": event["id"], "policy": eligibility, "username":username}
     print(result)
 
