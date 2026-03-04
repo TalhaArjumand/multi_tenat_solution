@@ -42,6 +42,7 @@ Out of scope:
 
 - `accessModel` in `{ MT, SSO }`.
 - `MT` is Model B and governed by this RFC.
+- For Model B requests, `accessModel` MUST be `MT` and `roleId` MUST match `^mt-`.
 
 Note: even if code currently infers model from `roleId`, runtime behavior must be equivalent to explicit model branching.
 
