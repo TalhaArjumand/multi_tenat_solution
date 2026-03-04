@@ -552,7 +552,9 @@ def check_multi_tenant_eligibility(request):
             print(f"Role {role_name} not allowed for customer {customer['name']} (permissionSet: {customer['permissionSet']})")
             return False
 
-        return {"approval": True}
+        # Multi-tenant requests don't need SSO-style approval workflow
+        # The approval is handled at the customer onboarding level
+        return {"approval": False}
 
     except Exception as e:
         print(f"Error checking multi-tenant eligibility: {e}")
@@ -586,9 +588,10 @@ def handler(event, context):
             if mt_eligible is False:
                 return eligibility_error(request)
             if mt_eligible:
-                request["approvalRequired"] = mt_eligible.get("approval", True)
+                mt_approval = mt_eligible.get("approval", False)
+                request["approvalRequired"] = mt_approval
                 request["isMultiTenant"] = True
-                invoke_workflow(request, True, notification_config, team_config)
+                invoke_workflow(request, mt_approval, notification_config, team_config)
         else:
             userId = get_user((data["username"]["S"])[4:])
             request["userId"] = userId

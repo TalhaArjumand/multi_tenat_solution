@@ -194,7 +194,7 @@
                 "sts:AssumeRole"
               ],
               "Resource": [
-                "*"
+                "arn:aws:iam::*:role/CloudIQS-MSP-*"
               ],
               "Effect": "Allow"
             }
@@ -206,7 +206,7 @@
           }
         ]
       },
-      "DependsOn": ["LambdaExecutionRole"]
+      "DependsOn": "LambdaExecutionRole"
     },
     "AmplifyResourcesPolicy": {
       "DependsOn": [

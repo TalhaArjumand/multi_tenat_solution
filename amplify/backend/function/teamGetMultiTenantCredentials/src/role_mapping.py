@@ -12,5 +12,7 @@ ROLE_NAME_MAP = {
 
 def get_role_arn(account_id, role_name):
     """Map a multi-tenant role name to the full IAM role ARN in the customer account."""
-    iam_role_name = ROLE_NAME_MAP.get(role_name, 'CloudIQS-MSP-AccessRole')
+    iam_role_name = ROLE_NAME_MAP.get(role_name)
+    if not iam_role_name:
+        raise ValueError(f"Unknown role name: {role_name}. Valid roles: {list(ROLE_NAME_MAP.keys())}")
     return f"arn:aws:iam::{account_id}:role/{iam_role_name}"

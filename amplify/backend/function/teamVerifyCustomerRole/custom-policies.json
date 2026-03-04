@@ -1,6 +1,6 @@
 [
   {
     "Action": ["sts:AssumeRole"],
-    "Resource": ["*"]
+    "Resource": ["arn:aws:iam::*:role/CloudIQS-MSP-*"]
   }
 ]
