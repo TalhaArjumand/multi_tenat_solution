@@ -125,24 +125,20 @@ async function update_cloudtrail_parameters() {
 
   const cloudtrailParametersJson = require(cloudtrailParametersJsonPath);
 
-  cloudtrailParametersJson.CloudTrailAuditLogs = CLOUDTRAIL_AUDIT_LOGS;
-  
-  fs.writeFileSync(
-    cloudtrailParametersJsonPath,
-    JSON.stringify(cloudtrailParametersJson, null, 4)
-  );
-}
+  const hasCloudTrailValue =
+    typeof CLOUDTRAIL_AUDIT_LOGS === "string" &&
+    CLOUDTRAIL_AUDIT_LOGS.trim().length > 0;
 
-async function update_cloudtrail_parameters() {
-  console.log(`updating amplify/backend/custom/cloudtrailLake/parameters.json"...`);
-
-  const cloudtrailParametersJsonPath = path.resolve(
-    `./amplify/backend/custom/cloudtrailLake/parameters.json`
-  );
-
-  const cloudtrailParametersJson = require(cloudtrailParametersJsonPath);
-
-  cloudtrailParametersJson.CloudTrailAuditLogs = CLOUDTRAIL_AUDIT_LOGS;
+  if (hasCloudTrailValue) {
+    cloudtrailParametersJson.CloudTrailAuditLogs = CLOUDTRAIL_AUDIT_LOGS.trim();
+    console.log(
+      "CloudTrailAuditLogs set from CLOUDTRAIL_AUDIT_LOGS environment variable."
+    );
+  } else {
+    console.log(
+      "CLOUDTRAIL_AUDIT_LOGS is not set; preserving existing CloudTrailAuditLogs value."
+    );
+  }
   
   fs.writeFileSync(
     cloudtrailParametersJsonPath,
