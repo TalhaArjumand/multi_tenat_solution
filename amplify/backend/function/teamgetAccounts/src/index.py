@@ -33,6 +33,11 @@ def handler(event, context):
 
         for page in paginator:
             for acct in page['Accounts']:
+                # Exclude non-usable organization accounts (for example CLOSED/SUSPENDED)
+                # so eligibility only shows actionable targets.
+                account_state = acct.get('State') or acct.get('Status')
+                if account_state != 'ACTIVE':
+                    continue
                 if not deployed_in_mgmt:
                     if acct['Id'] != mgmt_account_id:
                         account.extend(

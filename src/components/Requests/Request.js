@@ -14,7 +14,7 @@ import Textarea from "@awsui/components-react/textarea";
 import moment from "moment";
 import { DatePicker } from "antd";
 import "../../index.css";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   getGroupMemberships,
   requestTeam,
@@ -66,7 +66,6 @@ function Request(props) {
 
   const [accounts, setAccounts] = useState([]);
   const [accountStatus, setAccountStatus] = useState("loading");
-  const [allAccounts, setAllAccounts] = useState([]);
 
   const [permissions, setPermissions] = useState([]);
   const [permissionStatus, setPermissionStatus] = useState("loading");
@@ -85,20 +84,9 @@ function Request(props) {
   const [customers, setCustomers] = useState([]);
   const [customersLoading, setCustomersLoading] = useState(true);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const policyRequestIdRef = useRef(null);
 
   const history = useHistory();
-
-  function concatenateAccounts(data) {
-    let allAccounts = data.map((item) => item.accounts);
-    allAccounts = [].concat.apply([], allAccounts);
-
-    let uniqueAccounts = new Set();
-    allAccounts.forEach((account) => {
-      uniqueAccounts.add(JSON.stringify(account));
-    });
-
-    return Array.from(uniqueAccounts).map((account) => JSON.parse(account));
-  }
 
   function concatenatePermissions(data) {
     let uniquePermissions = new Set();
@@ -128,7 +116,7 @@ function Request(props) {
 
     // Check if this account belongs to a multi-tenant customer
     const customer = customers.find(c =>
-      c.accountIds && c.accountIds.includes(accountId) &&
+      c.accountIds && c.accountIds.map(String).includes(String(accountId)) &&
       c.roleStatus === 'established'
     );
 
@@ -164,23 +152,40 @@ function Request(props) {
     return permissionData;
   }
 
-  const getPolicy = () => {
+  const getPolicy = async () => {
     let args = {
       userId: props.userId,
       groupIds: props.groupIds,
     };
-    fetchPolicy(args)
+    const response = await fetchPolicy(args);
+    if (response?.id) {
+      policyRequestIdRef.current = response.id;
+    } else {
+      setAccountStatus("error");
+      setPermissionStatus("error");
+    }
   };
 
   function publishEvent() {
     const subscription = API.graphql(graphqlOperation(onPublishPolicy)).subscribe({
       next: (result) => {
-        const policy = result.value.data.onPublishPolicy.policy;
+        const payload = result?.value?.data?.onPublishPolicy;
+        if (!payload) {
+          return;
+        }
+
+        // Ignore policy events that do not belong to this page request.
+        if (!policyRequestIdRef.current || payload.id !== policyRequestIdRef.current) {
+          return;
+        }
+
+        const policy = payload.policy || [];
         if (policy?.length > 0) {
           setItem(policy);
-          const allAccts = concatenateAccounts(policy);
-          setAllAccounts(allAccts);
-          setAccounts(allAccts);
+          setAccounts([]);
+        } else {
+          setItem([]);
+          setAccounts([]);
         }
         setAccountStatus("finished");
         setPermissionStatus("finished");
@@ -215,23 +220,26 @@ function Request(props) {
   }
 
   function filterAccountsByCustomer(customerId) {
+    // Customer-scoped mapping: account dropdown source comes from customer.accountIds.
     if (!customerId) {
-      // Show all accounts if no customer selected
-      setAccounts(allAccounts);
-    } else {
-      // Find the customer and get their accountIds
-      const customer = customers.find(c => c.id === customerId);
-      if (customer && customer.accountIds && customer.accountIds.length > 0) {
-        // Filter accounts by checking if account.id is in customer.accountIds
-        const filtered = allAccounts.filter(acc => 
-          customer.accountIds.includes(acc.id)
-        );
-        setAccounts(filtered);
-      } else {
-        // No accounts mapped to this customer
-        setAccounts([]);
-      }
+      setAccounts([]);
+      return;
     }
+
+    const customer = customers.find((c) => c.id === customerId);
+    if (!customer || !customer.accountIds || customer.accountIds.length < 1) {
+      setAccounts([]);
+      return;
+    }
+
+    const customerScopedAccounts = customer.accountIds.map((id) => ({
+      id: String(id),
+      name: String(id),
+      customerId: customer.id,
+      customerName: customer.name || "",
+    }));
+
+    setAccounts(customerScopedAccounts);
   }
 
   function getSettings() {
@@ -253,13 +261,19 @@ function Request(props) {
   useEffect(() => {
     setEmail(props.user);
     getSettings();
-    // getEligibility();
-    getPolicy();
     props.addNotification([]);
     getMgmtPs();
     setTime(moment().format());
-    publishEvent();
+    // Subscribe first so we do not miss the publish event.
+    const subscription = publishEvent();
+    // Trigger async policy generation after subscription starts.
+    getPolicy();
     fetchCustomers();
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -311,6 +325,21 @@ function Request(props) {
 
   async function validate() {
     let error = false;
+    const roleValue = role?.value;
+    const isMtRole = typeof roleValue === "string" && roleValue.startsWith("mt-");
+
+    // Model B hardening: mt-* requests require customer context to be loaded and selected.
+    if (isMtRole) {
+      if (customersLoading) {
+        setRoleError("Customers are still loading. Please wait and try again.");
+        error = true;
+      }
+      if (!selectedCustomer?.value || !customerId) {
+        setRoleError("Select a customer for multi-tenant (mt-*) access.");
+        error = true;
+      }
+    }
+
     if (
       !duration ||
       isNaN(duration) ||
@@ -393,42 +422,47 @@ function Request(props) {
     }
     return false;
   }
-  async function checkApprovalAndApproverGroups(account, role) {
-    // Multi-tenant roles skip SSO approver group check
-    if (role && typeof role === 'string' && role.startsWith("mt-")) {
-      return true;
+
+  async function hasSufficientApprovers(groupIds) {
+    if (!Array.isArray(groupIds) || groupIds.length < 1) {
+      return false;
     }
+
+    const data = await getGroupMemberships(groupIds);
+    const requesterIsApprover = checkGroupMembership(props.groupIds, groupIds);
+    // If requester is also an approver, at least one additional approver must exist.
+    const approverGroupMembersRequired = requesterIsApprover ? 2 : 1;
+
+    return data.members.length >= approverGroupMembersRequired;
+  }
+
+  async function checkApprovalAndApproverGroups(account, role) {
+    const isMtRole = typeof role === "string" && role.startsWith("mt-");
+
+    // Model B: mt-* approvals are customer-scoped only.
+    if (isMtRole) {
+      const scopedCustomer = customers.find((c) => c.id === customerId);
+      if (!scopedCustomer) {
+        return false;
+      }
+      return hasSufficientApprovers(scopedCustomer.approverGroupIds || []);
+    }
+
+    // Non-mt roles keep the existing legacy eligibility + org approver checks.
     if (await checkApprovalNotRequired(account, role)) {
       return true;
     }
+
     const account_approvers = await fetchApprovers(account, "Account");
     if (account_approvers) {
-      const data = await getGroupMemberships(account_approvers.groupIds);
-      const requesterIsApprover = checkGroupMembership(
-        props.groupIds,
-        account_approvers.groupIds
-      );
-      // If the requester is also an approver, then we need at least 2 approvers to exist (i.e. at
-      // least one person who didn't make the request). Otherwise we only need a single approver to exist.
-      const approverGroupMembersRequired = requesterIsApprover ? 2 : 1;
-
-      if (data.members.length >= approverGroupMembersRequired) {
+      if (await hasSufficientApprovers(account_approvers.groupIds)) {
         return true;
       }
     }
     const ou = await fetchOU(account);
     const ou_approvers = await fetchApprovers(ou.Id, "OU");
     if (ou_approvers) {
-      const data = await getGroupMemberships(ou_approvers.groupIds);
-      const requesterIsApprover = checkGroupMembership(
-        props.groupIds,
-        ou_approvers.groupIds
-      );
-      // If the requester is also an approver, then we need at least 2 approvers to exist (i.e. at
-      // least one person who didn't make the request). Otherwise we only need a single approver to exist.
-      const approverGroupMembersRequired = requesterIsApprover ? 2 : 1;
-
-      if (data.members.length >= approverGroupMembersRequired) {
+      if (await hasSufficientApprovers(ou_approvers.groupIds)) {
         return true;
       }
     }
