@@ -407,9 +407,14 @@ def list_approvers(id):
 def get_approver_group_ids(accountId):
     approvers = []
     approvers.extend(list_approvers(accountId))
-    ou = get_ou(accountId)
-    if ou:
-        approvers.extend(list_approvers(ou["Id"]))
+    try:
+        ou = get_ou(accountId)
+        if ou:
+            approvers.extend(list_approvers(ou["Id"]))
+    except Exception as e:
+        # External customer accounts are not in our AWS Organization
+        # so OU lookup will fail — this is expected for multi-tenant
+        print(f"Could not get OU for account {accountId} (may be external): {e}")
     return approvers
 
 def get_approvers(userId):
@@ -552,9 +557,9 @@ def check_multi_tenant_eligibility(request):
             print(f"Role {role_name} not allowed for customer {customer['name']} (permissionSet: {customer['permissionSet']})")
             return False
 
-        # Multi-tenant requests don't need SSO-style approval workflow
-        # The approval is handled at the customer onboarding level
-        return {"approval": False}
+        # Multi-tenant requests MUST go through approval workflow
+        # The global approval setting should be respected
+        return {"approval": True}
 
     except Exception as e:
         print(f"Error checking multi-tenant eligibility: {e}")
@@ -588,7 +593,8 @@ def handler(event, context):
             if mt_eligible is False:
                 return eligibility_error(request)
             if mt_eligible:
-                mt_approval = mt_eligible.get("approval", False)
+                # Always require approval for multi-tenant to match SSO behavior
+                mt_approval = mt_eligible.get("approval", True)
                 request["approvalRequired"] = mt_approval
                 request["isMultiTenant"] = True
                 invoke_workflow(request, mt_approval, notification_config, team_config)

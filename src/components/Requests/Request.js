@@ -410,8 +410,28 @@ function Request(props) {
     return false;
   }
   async function checkApprovalAndApproverGroups(account, role) {
-    // Multi-tenant roles skip SSO approver group check
+    // For multi-tenant roles, check if account-level approvers exist
+    // but skip the OU check (external accounts aren't in our AWS Organization)
     if (role && typeof role === 'string' && role.startsWith("mt-")) {
+      if (await checkApprovalNotRequired(account, role)) {
+        return true;
+      }
+      // Check for account-level approvers
+      const account_approvers = await fetchApprovers(account, "Account");
+      if (account_approvers) {
+        const data = await getGroupMemberships(account_approvers.groupIds);
+        const requesterIsApprover = checkGroupMembership(
+          props.groupIds,
+          account_approvers.groupIds
+        );
+        const approverGroupMembersRequired = requesterIsApprover ? 2 : 1;
+        if (data.members.length >= approverGroupMembersRequired) {
+          return true;
+        }
+      }
+      // For multi-tenant, skip OU lookup since external accounts aren't in our org
+      // If no account-level approvers found, allow submission
+      // The backend teamRouter will enforce approval via the Approval SM
       return true;
     }
     if (await checkApprovalNotRequired(account, role)) {

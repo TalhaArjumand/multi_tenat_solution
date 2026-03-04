@@ -64,8 +64,8 @@
                   "ErrorEquals": [
                     "States.ALL"
                   ],
-                  "Next": "Grant Permission",
-                  "ResultPath": "$.mtCheckError"
+                  "Next": "Update Request Status - in progress",
+                  "ResultPath": "$.statusError"
                 }
               ],
               "OutputPath": "$.Payload"

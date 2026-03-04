@@ -124,6 +124,9 @@ export const handler = async (event) => {
       status = "ended";
     } else if ("grant" in event) {
       status = "in progress";
+    } else if ("isMultiTenant" in event && event.isMultiTenant && "multiTenantCredentials" in event) {
+      // Multi-tenant grant succeeded — the grant key might be named differently
+      status = "in progress";
     } else if (status === "approved") {
       status = "scheduled";
     } else if (!approval_required) {
