@@ -350,6 +350,8 @@ export const getEligibility = /* GraphQL */ `
       approvalRequired
       duration
       modifiedBy
+      customerId
+      customerName
       createdAt
       updatedAt
       __typename
@@ -386,6 +388,8 @@ export const listEligibilities = /* GraphQL */ `
         approvalRequired
         duration
         modifiedBy
+        customerId
+        customerName
         createdAt
         updatedAt
         __typename
