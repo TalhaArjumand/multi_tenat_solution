@@ -29,6 +29,15 @@ def get_mgmt_account_id():
 mgmt_account_id = get_mgmt_account_id()
 
 
+def emit_structured_log(event_name, **fields):
+    payload = {"event": event_name}
+    payload.update(fields)
+    try:
+        print(json.dumps(payload, separators=(",", ":"), default=str))
+    except Exception as error:
+        print(f'{{"event":"{event_name}","logSerializationError":"{error}"}}')
+
+
 def publishPolicy(result):
     session = boto3.session.Session()
     credentials = session.get_credentials()
@@ -197,6 +206,7 @@ def handler(event, context):
     userId = event["userId"]
     groupIds = event["groupIds"]
     username = event["username"]
+    request_id = event.get("id")
     eligibility = []
     maxDuration = 0
     
@@ -213,6 +223,20 @@ def handler(event, context):
         print(entitlement)
         if "Item" not in entitlement.keys():
             continue
+        item = entitlement["Item"]
+        item_accounts = item.get("accounts", []) or []
+        item_ous = item.get("ous", []) or []
+        emit_structured_log(
+            "LEGACY_ENTITLEMENT_PATH_USED",
+            requestId=request_id,
+            principalId=id,
+            username=username,
+            hasCustomerId=bool(item.get("customerId")),
+            customerId=item.get("customerId"),
+            path="legacy_accounts_ou",
+            accountCount=len(item_accounts),
+            ouCount=len(item_ous),
+        )
         duration = entitlement["Item"]["duration"]
         if int(duration) > maxDuration:
             maxDuration = int(duration)
@@ -245,6 +269,16 @@ def handler(event, context):
         ]
 
         if new_customer_accounts:
+            emit_structured_log(
+                "LEGACY_ENTITLEMENT_PATH_USED",
+                requestId=request_id,
+                principalId=None,
+                username=username,
+                hasCustomerId=False,
+                customerId=None,
+                path="legacy_global_customer_append",
+                appendedAccountCount=len(new_customer_accounts),
+            )
             customer_policy = {
                 "accounts": new_customer_accounts,
                 "permissions": [],
