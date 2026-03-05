@@ -246,6 +246,8 @@ def get_request_data(data, expire, approval_required):
         "startTime": data["startTime"]["S"],
         "justification": data["justification"]["S"],
         "ticketNo": data.get("ticketNo", {}).get("S"),
+        "customerId": data.get("customerId", {}).get("S"),
+        "customerName": data.get("customerName", {}).get("S"),
         "approver": data.get("approver", {}).get("S"),
         "revoker": data.get("revoker", {}).get("S"),
         "instanceARN": sso_instance['InstanceArn'],
@@ -255,13 +257,15 @@ def get_request_data(data, expire, approval_required):
     }
     return request
 
-def eligibility_error(request):
-    print("Error - Invalid Eligibility")
+def eligibility_error(request, reason="INVALID_ELIGIBILITY"):
+    print(f"Error - Invalid Eligibility ({reason})")
     input = {
             'id': request["id"],
-            'status': 'error'
+            'status': 'error',
+            'comment': reason,
             }
     updateRequest(input)
+    return {"error": reason}
     
 def get_eligibility(request, userId):
     eligible = False
@@ -403,6 +407,17 @@ def list_approvers(id):
             return []
     except ClientError as e:
         print(e.response['Error']['Message'])
+
+def get_customer(customer_id):
+    if not customer_id:
+        return None
+    customers_table = dynamodb.Table(customers_table_name)
+    response = customers_table.get_item(
+        Key={
+            'id': customer_id
+        }
+    )
+    return response.get("Item")
         
 def get_approver_group_ids(accountId):
     approvers = []
@@ -424,8 +439,9 @@ def get_approvers(userId):
         UserId=userId
     )
     approver_id = "idc_" + response['UserName']
-    for email in response['Emails']:
-        if email:
+    approver = None
+    for email in response.get('Emails', []):
+        if email and email.get("Value"):
             approver = email["Value"]
             break
     return {"approver_id": approver_id, "approver": approver}
@@ -443,26 +459,62 @@ def list_group_membership(groupId):
         return all_groups
     except ClientError as e:
         print(e.response['Error']['Message'])
+        return []
+
+def get_approvers_details_from_group_ids(group_ids):
+    approvers = []
+    approver_ids = []
+    member_user_ids = set()
+    if group_ids:
+        for group in group_ids:
+            for result in list_group_membership(group):
+                user_id = result.get("MemberId", {}).get("UserId")
+                if not user_id or user_id in member_user_ids:
+                    continue
+                member_user_ids.add(user_id)
+                data = get_approvers(user_id)
+                approver_email = data.get("approver")
+                if approver_email and approver_email not in approvers:
+                    approvers.append(approver_email)
+                approver_id = data.get("approver_id")
+                if approver_id:
+                    approver_id = approver_id.lower()
+                    if approver_id not in approver_ids:
+                        approver_ids.append(approver_id)
+    return {"approvers": approvers, "approver_ids": approver_ids, "member_count": len(member_user_ids)}
         
 async def get_approvers_details(accountId):
     approver_groups = get_approver_group_ids(accountId)
-    approvers = []
-    approver_ids = []
-    if approver_groups:
-        for group in approver_groups:
-            approvers_data = [get_approvers(result["MemberId"]["UserId"])
-                for result in list_group_membership(group)]
-            for data in approvers_data:
-                if data["approver"] not in approvers:
-                    approvers.append(data["approver"])
-                    approver_ids.append(data["approver_id"].lower())
-    return {"approvers":approvers, "approver_ids":approver_ids}
+    approver_details = get_approvers_details_from_group_ids(approver_groups)
+    return {
+        "approvers": approver_details["approvers"],
+        "approver_ids": approver_details["approver_ids"],
+    }
 
-async def updateRequestDetails(request_id, username, accountId, roleId):
+async def updateRequestDetails(request_id, username, accountId, roleId, customerId=None):
     email = get_email(username)
-    approver_details = await get_approvers_details(accountId)
+    if roleId.startswith("mt-"):
+        customer = get_customer(customerId)
+        approver_group_ids = customer.get("approverGroupIds", []) if customer else []
+        approver_details = get_approvers_details_from_group_ids(approver_group_ids)
+    else:
+        approver_details = await get_approvers_details(accountId)
     approver_ids = approver_details["approver_ids"]
     approvers = approver_details["approvers"]
+
+    if roleId.startswith("mt-"):
+        requester_approver_id = (username or "").lower()
+        if requester_approver_id and not requester_approver_id.startswith("idc_"):
+            requester_approver_id = f"idc_{requester_approver_id}"
+        approver_ids = [
+            approver_id for approver_id in approver_ids
+            if approver_id != requester_approver_id
+        ]
+        requester_email = (email or "").lower()
+        approvers = [
+            approver for approver in approvers
+            if approver and approver.lower() != requester_email
+        ]
 
     input = {
         'id': request_id,
@@ -501,7 +553,13 @@ def request_is_updated(status,data,username,request_id):
     if status in ["error", "ended"]:
         return updated
     elif status == "pending" and "email" not in data.keys():
-        asyncio.run(updateRequestDetails(request_id, username, data["accountId"]["S"], data["roleId"]["S"]))
+        asyncio.run(updateRequestDetails(
+            request_id,
+            username,
+            data["accountId"]["S"],
+            data["roleId"]["S"],
+            data.get("customerId", {}).get("S"),
+        ))
         print("updating request details")
     elif status in ["approved","rejected"] and "approver" not in data.keys():
         updateApproverDetails(request_id,data["approverId"]["S"])
@@ -528,42 +586,77 @@ def check_multi_tenant_eligibility(request):
     Check if request is for a multi-tenant customer account.
     If so, validate eligibility based on Customers table.
     """
-    account_id = request.get("accountId")
+    account_id = str(request.get("accountId", ""))
     role_id = request.get("roleId", "")
+    customer_id = request.get("customerId")
 
     if not role_id.startswith("mt-"):
         return None
 
+    if not customer_id:
+        print("Missing customerId for multi-tenant request")
+        return {"error": "MISSING_CUSTOMER_ID"}
+
     try:
-        customers_table = dynamodb.Table(customers_table_name)
-        response = customers_table.scan(
-            FilterExpression='contains(accountIds, :acctId) AND roleStatus = :status',
-            ExpressionAttributeValues={
-                ':acctId': account_id,
-                ':status': 'established'
-            }
-        )
+        customer = get_customer(customer_id)
+        if not customer:
+            print(f"Customer not found for customerId {customer_id}")
+            return {"error": "CUSTOMER_NOT_FOUND"}
+        if customer.get("roleStatus") != "established":
+            print(f"Customer {customer_id} roleStatus is not established")
+            return {"error": "CUSTOMER_ROLE_NOT_ESTABLISHED"}
 
-        if not response.get('Items'):
-            print(f"No established customer found for account {account_id}")
-            return False
-
-        customer = response['Items'][0]
+        account_ids = [str(customer_account_id) for customer_account_id in customer.get("accountIds", [])]
+        if account_id not in account_ids:
+            print(f"Account {account_id} is not mapped to customer {customer_id}")
+            return {"error": "CUSTOMER_ACCOUNT_MISMATCH"}
 
         role_name = role_id.replace("mt-", "")
         allowed_roles = get_allowed_roles_for_permission_set(customer.get('permissionSet', 'read-only'))
 
         if role_name not in allowed_roles:
             print(f"Role {role_name} not allowed for customer {customer['name']} (permissionSet: {customer['permissionSet']})")
-            return False
+            return {"error": "INVALID_MT_ROLE_FOR_CUSTOMER"}
+
+        approver_group_ids = customer.get("approverGroupIds") or []
+        if len(approver_group_ids) < 1:
+            print(f"No approver groups configured for customer {customer_id}")
+            return {"error": "MISSING_CUSTOMER_APPROVERS"}
+
+        approver_details = get_approvers_details_from_group_ids(approver_group_ids)
+        requester_email = (request.get("email") or "").lower()
+        requester_approver_id = (request.get("username") or "").lower()
+        if requester_approver_id and not requester_approver_id.startswith("idc_"):
+            requester_approver_id = f"idc_{requester_approver_id}"
+        requester_is_approver = requester_approver_id in [
+            (approver_id or "").lower() for approver_id in (approver_details.get("approver_ids") or [])
+        ]
+        approver_group_members_required = 2 if requester_is_approver else 1
+        if approver_details["member_count"] < approver_group_members_required:
+            print(
+                f"Insufficient approver members for customer {customer_id}. "
+                f"members={approver_details['member_count']} required={approver_group_members_required}"
+            )
+            return {"error": "INSUFFICIENT_APPROVER_MEMBERS"}
+
+        approver_details["approvers"] = [
+            approver for approver in approver_details["approvers"]
+            if approver.lower() != requester_email
+        ]
+        requester_approver_id = (request.get("username") or "").lower()
+        if requester_approver_id and not requester_approver_id.startswith("idc_"):
+            requester_approver_id = f"idc_{requester_approver_id}"
+        approver_details["approver_ids"] = [
+            approver_id for approver_id in approver_details["approver_ids"]
+            if approver_id != requester_approver_id
+        ]
 
         # Multi-tenant requests MUST go through approval workflow
-        # The global approval setting should be respected
-        return {"approval": True}
+        return {"approval": True, "approverDetails": approver_details}
 
     except Exception as e:
         print(f"Error checking multi-tenant eligibility: {e}")
-        return False
+        return {"error": "MT_ELIGIBILITY_CHECK_FAILED"}
 
 
 def handler(event, context):
@@ -590,13 +683,16 @@ def handler(event, context):
         role_id = data.get("roleId", {}).get("S", "")
         if role_id.startswith("mt-"):
             mt_eligible = check_multi_tenant_eligibility(request)
-            if mt_eligible is False:
-                return eligibility_error(request)
-            if mt_eligible:
+            if not mt_eligible or mt_eligible.get("error"):
+                error_code = mt_eligible.get("error", "INVALID_MT_ELIGIBILITY") if mt_eligible else "INVALID_MT_ELIGIBILITY"
+                return eligibility_error(request, error_code)
+            if mt_eligible.get("approval"):
                 # Always require approval for multi-tenant to match SSO behavior
-                mt_approval = mt_eligible.get("approval", True)
+                mt_approval = True
                 request["approvalRequired"] = mt_approval
                 request["isMultiTenant"] = True
+                request["approvers"] = mt_eligible["approverDetails"]["approvers"]
+                request["approver_ids"] = mt_eligible["approverDetails"]["approver_ids"]
                 invoke_workflow(request, mt_approval, notification_config, team_config)
         else:
             userId = get_user((data["username"]["S"])[4:])
