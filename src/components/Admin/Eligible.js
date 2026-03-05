@@ -21,18 +21,13 @@ import {
   Select,
   ColumnLayout,
   Toggle,
-  Input,
-  Spinner
+  Input
 } from "@awsui/components-react";
 import { useCollection } from "@awsui/collection-hooks";
-import Ous from "../Shared/Ous";
 import { API, graphqlOperation } from "aws-amplify";
-import { onPublishOUs, onPublishPermissions } from "../../graphql/subscriptions";
+import { listCustomers } from "../../graphql/queries";
 import {
-  fetchAccounts,
-  fetchOUs,
   fetchIdCGroups,
-  fetchPermissions,
   addPolicy,
   editPolicy,
   delPolicy,
@@ -76,9 +71,9 @@ const COLUMN_DEFINITIONS = [
     sortingField: "accounts",
     header: "Accounts",
     cell: (item) => (
-      <>{item.accounts.length > 0 ?  <TextContent>
+      <>{(item.accounts || []).length > 0 ?  <TextContent>
         <ul>
-          {item.accounts.map(({name}) => (
+          {(item.accounts || []).map(({name}) => (
             <li>{name}</li>
           ))}
         </ul>
@@ -87,13 +82,20 @@ const COLUMN_DEFINITIONS = [
     width: 200,
   },
   {
+    id: "customerName",
+    sortingField: "customerName",
+    header: "Customer",
+    cell: (item) => item.customerName || "-",
+    width: 200,
+  },
+  {
     id: "ous",
     sortingField: "ous",
     header: "OUs",
     cell: (item) => (
-      <>{item.ous.length > 0 ?  <TextContent>
+      <>{(item.ous || []).length > 0 ?  <TextContent>
         <ul>
-          {item.ous.map(({name}) => (
+          {(item.ous || []).map(({name}) => (
             <li>{name}</li>
           ))}
         </ul>
@@ -108,7 +110,7 @@ const COLUMN_DEFINITIONS = [
     cell: (item) => (
       <TextContent>
         <ul>
-          {item.permissions.map(({name}) => (
+          {(item.permissions || []).map(({name}) => (
             <li>{name}</li>
           ))}
         </ul>
@@ -162,6 +164,7 @@ const MyCollectionPreferences = ({ preferences, setPreferences }) => {
               { id: "name", label: "name" },
               { id: "type", label: "type" },
               { id: "ticketNo", label: "ticketNo" },
+              { id: "customerName", label: "customerName" },
               { id: "accounts", label: "accounts" },
               { id: "ous", label: "ous" },
               { id: "permissions", label: "permissions" },
@@ -201,9 +204,8 @@ function Eligible(props) {
       "name",
       "type",
       "ticketNo",
+      "customerName",
       "accounts",
-      "ous",
-      "permissions",
       "duration",
       "approvalRequired",
       "modifiedBy"
@@ -301,15 +303,10 @@ function Eligible(props) {
   const [ticketError, setTicketError] = useState("");
   const [resource, setResource] = useState("");
   const [resourceError, setResourceError] = useState("");
-  const [account, setAccount] = useState([]);
-  const [accountError, setAccountError] = useState("");
-  const [ou, setOU] = useState([]);
-  const [ouError, setOuError] = useState("");
-  const [permission, setPermission] = useState([]);
-  const [permissionError, setPermissionError] = useState("");
-
-  const [accounts, setAccounts] = useState([]);
-  const [accountStatus, setAccountStatus] = useState("finished");
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customerError, setCustomerError] = useState("");
+  const [customers, setCustomers] = useState([]);
+  const [customerStatus, setCustomerStatus] = useState("finished");
 
   const [users, setUsers] = useState([]);
   const [userStatus, setUserStatus] = useState("finished");
@@ -317,20 +314,13 @@ function Eligible(props) {
   const [groups, setGroups] = useState([]);
   const [groupStatus, setGroupStatus] = useState("finished");
 
-  const [ous, setOUs] = useState([]);
-  const [ouStatus, setOUStatus] = useState("finished"); // eslint-disable-line no-unused-vars
-
-  const [permissions, setPermissions] = useState([]);
-  const [permissionStatus, setPermissionStatus] = useState("finished");
   const [ticketRequired, setTicketRequired] = useState(true);
 
 
   useEffect(() => {
     views();
     props.addNotification([]);
-    getOUs()
-    getAccounts();
-    getPermissions();
+    getCustomers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -393,9 +383,13 @@ function Eligible(props) {
         setConfirmLoading(true);
         const data = {
           id: selectedItems[0].id,
-          accounts: account.map(({ value, label }) => ({name: label, id: value})),
-          permissions: permission.map(({ value,label }) => ({name: label, id: value})),
-          ous: ou.map(({ value,label }) => ({name: label, id: value})),
+          customerId: selectedCustomer?.value || "",
+          customerName: selectedCustomer?.label || "",
+          // Phase A migration: Gate-1 stores principal->customer only.
+          // Keep legacy fields empty for schema/backward compatibility.
+          accounts: [],
+          permissions: [],
+          ous: [],
           ticketNo: ticketNo,
           approvalRequired: approvalRequired,
           duration: duration
@@ -416,33 +410,8 @@ function Eligible(props) {
   }
 
   function handleEdit() {
-    setAccount(
-      selectedItems[0].accounts.map((data) => {
-        return {
-          label: data.name,
-          value: data.id,
-          description: data.id,
-        };
-      })
-    );
-    setOU(
-      selectedItems[0].ous.map((data) => {
-        return {
-          label: data.name,
-          value: data.id,
-          description: data.id,
-        };
-      })
-    );
-    setPermission(
-      selectedItems[0].permissions.map((data) => {
-        return {
-          label: data.name,
-          value: data.id,
-          description: data.id,
-        };
-      })
-    );
+    setSelectedCustomer(inferCustomerForPolicy(selectedItems[0]));
+    setTicketNo(selectedItems[0].ticketNo || "");
     setApprovalRequired(
       selectedItems[0].approvalRequired 
     );
@@ -474,45 +443,67 @@ function Eligible(props) {
     });
   }
 
-  function getOUs() {
-    setOUStatus("loading");
-    fetchOUs().then(() =>{
-      const subscription = API.graphql(
-        graphqlOperation(onPublishOUs)
-      ).subscribe({
-        next: (result) => {
-          const data = result.value.data.onPublishOUs.ous
-          setOUs(JSON.parse(data));
-          setOUStatus("finished");
-          subscription.unsubscribe();
-        },
+  function getCustomers() {
+    setCustomerStatus("loading");
+    API.graphql(graphqlOperation(listCustomers))
+      .then((result) => {
+        const items = result?.data?.listCustomers?.items || [];
+        const eligibleCustomers = items.filter((customer) => {
+          const active = customer?.status === "active" || !customer?.status;
+          const hasAccounts = Array.isArray(customer?.accountIds) && customer.accountIds.length > 0;
+          return active && hasAccounts;
+        });
+        setCustomers(eligibleCustomers);
+        setCustomerStatus("finished");
+      })
+      .catch((error) => {
+        console.error("Error fetching customers for eligibility policy", error);
+        setCustomers([]);
+        setCustomerStatus("error");
       });
-    });
   }
 
-  function getAccounts() {
-    setAccountStatus("loading");
-    fetchAccounts().then((data) => {
-      setAccounts(data);
-      setAccountStatus("finished");
-    });
+  function getCustomerById(customerId) {
+    if (!customerId) {
+      return null;
+    }
+    return customers.find((customer) => customer.id === customerId) || null;
   }
 
-  function getPermissions() {
-    setPermissionStatus("loading");
-    fetchPermissions().then((data) => {
-      const subscription = API.graphql(
-        graphqlOperation(onPublishPermissions)
-      ).subscribe({
-        next: (result) => {
-          if (result.value.data.onPublishPermissions.id === data.id) {
-            setPermissions(result.value.data.onPublishPermissions.permissions);
-            setPermissionStatus("finished");
-            subscription.unsubscribe();
-          }
-        },
-      });
-    });
+  function inferCustomerForPolicy(policy) {
+    if (!policy) {
+      return null;
+    }
+
+    if (policy.customerId) {
+      const directMatch = getCustomerById(policy.customerId);
+      if (directMatch) {
+        return {
+          label: directMatch.name,
+          value: directMatch.id,
+          description: `${directMatch.accountIds?.length || 0} account(s)`,
+        };
+      }
+    }
+
+    const policyAccountIds = new Set((policy.accounts || []).map((item) => String(item.id)));
+    if (policyAccountIds.size < 1) {
+      return null;
+    }
+
+    const matchedCustomer = customers.find((customer) =>
+      (customer.accountIds || []).some((id) => policyAccountIds.has(String(id)))
+    );
+
+    if (!matchedCustomer) {
+      return null;
+    }
+
+    return {
+      label: matchedCustomer.name,
+      value: matchedCustomer.id,
+      description: `${matchedCustomer.accountIds?.length || 0} account(s)`,
+    };
   }
 
   const onResourceChange = (value) => {
@@ -521,16 +512,11 @@ function Eligible(props) {
 
   async function validate(action) {
     let valid = true;
-    if (permission.length < 1 ) {
+    if (!selectedCustomer || !selectedCustomer.value) {
       valid = false;
-      setPermissionError("Select permission set");
+      setCustomerError("Select a customer");
     }
-    if (ou.length < 1 && account.length < 1) {
-      valid = false;
-      setOuError("Select OUs and/or Accounts");
-      setAccountError("Select OUs and/or Accounts");
-    }
-    if ((!ticketNo && ticketRequired) || !(/^[a-zA-Z0-9]+$/.test(ticketNo[0]))) {
+    if ((ticketRequired && !ticketNo) || (ticketNo && !/^[a-zA-Z0-9]+$/.test(ticketNo))) {
       setTicketError("Enter valid change management ticket number");
       valid = false;
     }
@@ -538,11 +524,11 @@ function Eligible(props) {
       setDurationError(`Enter number between 1-8000`);
       valid = false;
     }
-    if (!resource && action === "submit") {
+    if ((!Array.isArray(resource) || resource.length < 1) && action === "submit") {
       setResourceError("Select a valid entity");
       valid = false;
     }
-    if (!Type && action === "submit") {
+    if ((!Type || !Type.value) && action === "submit") {
       setTypeError("Select a valid entity type");
       valid = false;
     }
@@ -559,9 +545,13 @@ function Eligible(props) {
           const data = {
             type: Type.value,
             name: item.label,
-            accounts: account.map(({ value, label }) => ({name: label, id: value})),
-            permissions: permission.map(({ value,label }) => ({name: label, id: value})),
-            ous: ou.map(({ value,label }) => ({name: label, id: value})),
+            customerId: selectedCustomer?.value || "",
+            customerName: selectedCustomer?.label || "",
+            // Phase A migration: Gate-1 stores principal->customer only.
+            // Keep legacy fields empty for schema/backward compatibility.
+            accounts: [],
+            permissions: [],
+            ous: [],
             id: item.value,
             ticketNo: ticketNo,
             approvalRequired: approvalRequired,
@@ -591,12 +581,8 @@ function Eligible(props) {
     setTypeError("");
     setResource("");
     setResourceError("");
-    setAccount([]);
-    setAccountError("");
-    setOU([]);
-    setOuError("");
-    setPermission([]);
-    setPermissionError("");
+    setSelectedCustomer(null);
+    setCustomerError("");
     setTicketNo("");
     setTicketError("");
   }
@@ -807,87 +793,28 @@ function Eligible(props) {
               />
             </FormField>
             <FormField
-              label="Accounts"
+              label="Customer"
               stretch
-              description="List of Eligible Accounts"
-              errorText={accountError}
+              description="Customer context for requester authorization (Gate-1)"
+              errorText={customerError}
             >
-              <Multiselect
-                statusType={accountStatus}
-                placeholder="Select accounts"
-                loadingText="Loading accounts"
+              <Select
+                statusType={customerStatus}
+                placeholder="Select customer"
+                loadingText="Loading customers"
                 filteringType="auto"
-                empty="No options"
-                options={accounts.map((account) => ({
-                  label: account.name,
-                  value: account.id,
-                  description: account.id,
+                empty="No customers found"
+                options={customers.map((customer) => ({
+                  label: customer.name,
+                  value: customer.id,
+                  description: `${customer.accountIds?.length || 0} account(s)`,
                 }))}
-                selectedOptions={account}
-                onChange={({ detail }) => {
-                  setAccountError();
-                  setAccount(detail.selectedOptions);
+                selectedOption={selectedCustomer}
+                onChange={(event) => {
+                  setCustomerError();
+                  setSelectedCustomer(event.detail.selectedOption);
                 }}
                 selectedAriaLabel="selected"
-                deselectAriaLabel={(e) => `Remove ${e.label}`}
-              />
-            </FormField>
-            <FormField
-              label="OUs"
-              stretch
-              description="List of Eligible OUs"
-              errorText={ouError}
-            >
-                {ous.length === 1 ? (<Ous
-                  options={ous}
-                  setResource={setOU}
-                  resource={ou}
-                  />) : <Spinner size="large"/>}
-
-              {/* <Multiselect
-                statusType={ouStatus}
-                placeholder="Select OUs"
-                loadingText="Loading OUs"
-                filteringType="auto"
-                empty="No options"
-                options={ous.map((ou) => ({
-                  label: ou.Name,
-                  value: ou.Id,
-                  description: ou.Id,
-                }))}
-                selectedOptions={ou}
-                onChange={({ detail }) => {
-                  setOuError();
-                  setOU(detail.selectedOptions);
-                }}
-                selectedAriaLabel="selected"
-                deselectAriaLabel={(e) => `Remove ${e.label}`}
-              /> */}
-            </FormField>
-            <FormField
-              label="Permission"
-              stretch
-              description="List of Eligible Permissions"
-              errorText={permissionError}
-            >
-              <Multiselect
-                statusType={permissionStatus}
-                placeholder="Select Permissions"
-                loadingText="Loading Permissions"
-                filteringType="auto"
-                empty="No options"
-                options={permissions.map((permission) => ({
-                  label: permission.Name,
-                  value: permission.Arn,
-                  description: permission.Arn,
-                }))}
-                selectedOptions={permission}
-                onChange={({ detail }) => {
-                  setPermissionError();
-                  setPermission(detail.selectedOptions);
-                }}
-                selectedAriaLabel="selected"
-                deselectAriaLabel={(e) => `Remove ${e.label}`}
               />
             </FormField>
             <FormField
@@ -1009,86 +936,28 @@ function Eligible(props) {
               />
             </FormField>
             <FormField
-              label="Account"
+              label="Customer"
               stretch
-              description="List of Eligible Accounts"
-              errorText={accountError}
+              description="Customer context for requester authorization (Gate-1)"
+              errorText={customerError}
             >
-              <Multiselect
-                statusType={accountStatus}
-                placeholder="Select accounts"
-                loadingText="Loading accounts"
+              <Select
+                statusType={customerStatus}
+                placeholder="Select customer"
+                loadingText="Loading customers"
                 filteringType="auto"
-                empty="No options"
-                options={accounts.map((account) => ({
-                  label: account.name,
-                  value: account.id,
-                  description: account.id,
+                empty="No customers found"
+                options={customers.map((customer) => ({
+                  label: customer.name,
+                  value: customer.id,
+                  description: `${customer.accountIds?.length || 0} account(s)`,
                 }))}
-                selectedOptions={account}
-                onChange={({ detail }) => {
-                  setAccountError();
-                  setAccount(detail.selectedOptions);
+                selectedOption={selectedCustomer}
+                onChange={(event) => {
+                  setCustomerError();
+                  setSelectedCustomer(event.detail.selectedOption);
                 }}
                 selectedAriaLabel="selected"
-                deselectAriaLabel={(e) => `Remove ${e.label}`}
-              />
-            </FormField>
-            <FormField
-              label="OU"
-              stretch
-              description="List of Eligible OUs"
-              errorText={ouError}
-            >
-              {ous.length === 1 ? (<Ous
-                  options={ous}
-                  setResource={setOU}
-                  resource={ou}
-                  />) : <Spinner size="large"/>}
-              {/* <Multiselect
-                statusType={ouStatus}
-                placeholder="Select OUs"
-                loadingText="Loading OUs"
-                filteringType="auto"
-                empty="No options"
-                options={ous.map((ou) => ({
-                  label: ou.Name,
-                  value: ou.Id,
-                  description: ou.Id,
-                }))}
-                selectedOptions={ou}
-                onChange={({ detail }) => {
-                  setOuError();
-                  setOU(detail.selectedOptions);
-                }}
-                selectedAriaLabel="selected"
-                deselectAriaLabel={(e) => `Remove ${e.label}`}
-              /> */}
-            </FormField>
-            <FormField
-              label="Permission"
-              stretch
-              description="List of Eligible Permissions"
-              errorText={permissionError}
-            >
-              <Multiselect
-                statusType={permissionStatus}
-                placeholder="Select Permissions"
-                loadingText="Loading Permissions"
-                filteringType="auto"
-                empty="No options"
-                options={permissions.map((permission) => ({
-                  label: permission.Name,
-                  value: permission.Arn,
-                  description: permission.Arn,
-                }))}
-                selectedOptions={permission}
-                onChange={({ detail }) => {
-                  setPermissionError();
-                  setPermission(detail.selectedOptions);
-                }}
-                selectedAriaLabel="selected"
-                deselectAriaLabel={(e) => `Remove ${e.label}`}
               />
             </FormField>
             <FormField
