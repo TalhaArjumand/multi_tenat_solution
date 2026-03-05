@@ -57,6 +57,7 @@ function Request(props) {
 
   const [account, setAccount] = useState([]);
   const [accountError, setAccountError] = useState("");
+  const [customerError, setCustomerError] = useState("");
 
   const [time, setTime] = useState("");
   const [timeError, setTimeError] = useState("");
@@ -313,11 +314,11 @@ function Request(props) {
     props.addNotification([]);
   }
 
-  function sendError() {
+  function sendErrorWithMessage(message) {
     props.addNotification([
       {
         type: "error",
-        content: `No approver for Account - ${account.label}`,
+        content: message,
         dismissible: true,
         onDismiss: () => props.addNotification([]),
       },
@@ -327,6 +328,11 @@ function Request(props) {
 
   async function validate() {
     let error = false;
+    const isMtRole = typeof role?.value === "string" && role.value.startsWith("mt-");
+    const selectedCustomerRecord = selectedCustomer?.value
+      ? customers.find((c) => c.id === selectedCustomer.value)
+      : null;
+
     if (
       !duration ||
       isNaN(duration) ||
@@ -369,6 +375,22 @@ function Request(props) {
       setTicketError("Enter valid change management ticket number");
       error = true;
     }
+    if (isMtRole) {
+      if (customersLoading) {
+        setCustomerError("Customers are still loading. Please wait.");
+        error = true;
+      } else if (!selectedCustomer?.value || !customerId) {
+        setCustomerError("Select a customer for multi-tenant access.");
+        error = true;
+      } else if (
+        approvalRequired &&
+        (!Array.isArray(selectedCustomerRecord?.approverGroupIds) ||
+          selectedCustomerRecord.approverGroupIds.length < 1)
+      ) {
+        setCustomerError("No approver groups configured for selected customer.");
+        error = true;
+      }
+    }
     return error;
   }
 
@@ -377,10 +399,19 @@ function Request(props) {
     setSubmitLoading(true);
     const isValid = await validate();
     if (!isValid) {
+      const isMtRole = typeof role?.value === "string" && role.value.startsWith("mt-");
+      const shouldCheckApproverGroups = approvalRequired || isMtRole;
       const shouldSendRequest =
-        !approvalRequired ||
+        !shouldCheckApproverGroups ||
         (await checkApprovalAndApproverGroups(account.value, role.value));
-      shouldSendRequest ? sendRequest() : sendError();
+      if (shouldSendRequest) {
+        sendRequest();
+      } else {
+        const message = isMtRole
+          ? "No valid approver route for selected customer."
+          : `No approver for Account - ${account.label}`;
+        sendErrorWithMessage(message);
+      }
     } else {
       setSubmitLoading(false);
     }
@@ -413,29 +444,36 @@ function Request(props) {
     return false;
   }
   async function checkApprovalAndApproverGroups(account, role) {
-    // For multi-tenant roles, check if account-level approvers exist
-    // but skip the OU check (external accounts aren't in our AWS Organization)
-    if (role && typeof role === 'string' && role.startsWith("mt-")) {
-      if (await checkApprovalNotRequired(account, role)) {
+    if (role && typeof role === "string" && role.startsWith("mt-")) {
+      const scopedCustomer = selectedCustomer?.value
+        ? customers.find((c) => c.id === selectedCustomer.value)
+        : customers.find((c) => c.id === customerId);
+      if (!scopedCustomer) {
+        setCustomerError("Select a customer for multi-tenant access.");
+        return false;
+      }
+
+      const approverGroupIds = Array.isArray(scopedCustomer.approverGroupIds)
+        ? scopedCustomer.approverGroupIds
+        : [];
+      if (approverGroupIds.length < 1) {
+        setCustomerError("No approver groups configured for selected customer.");
+        return false;
+      }
+
+      const data = await getGroupMemberships(approverGroupIds);
+      const memberCount = data?.members?.length || 0;
+      const requesterIsApprover = checkGroupMembership(
+        props.groupIds,
+        approverGroupIds
+      );
+      const approverGroupMembersRequired = requesterIsApprover ? 2 : 1;
+      if (memberCount >= approverGroupMembersRequired) {
         return true;
       }
-      // Check for account-level approvers
-      const account_approvers = await fetchApprovers(account, "Account");
-      if (account_approvers) {
-        const data = await getGroupMemberships(account_approvers.groupIds);
-        const requesterIsApprover = checkGroupMembership(
-          props.groupIds,
-          account_approvers.groupIds
-        );
-        const approverGroupMembersRequired = requesterIsApprover ? 2 : 1;
-        if (data.members.length >= approverGroupMembersRequired) {
-          return true;
-        }
-      }
-      // For multi-tenant, skip OU lookup since external accounts aren't in our org
-      // If no account-level approvers found, allow submission
-      // The backend teamRouter will enforce approval via the Approval SM
-      return true;
+
+      setCustomerError("Insufficient customer approver members configured.");
+      return false;
     }
     if (await checkApprovalNotRequired(account, role)) {
       return true;
@@ -516,10 +554,11 @@ function Request(props) {
               label="Customer"
               stretch
               description="Select customer to filter accounts"
+              errorText={customerError}
             >
               <Select
                 statusType={customersLoading ? "loading" : "finished"}
-                placeholder="Select a customer (optional)"
+                placeholder="Select a customer (required for multi-tenant roles)"
                 loadingText="Loading customers"
                 filteringType="auto"
                 empty="No customers found"
@@ -535,6 +574,7 @@ function Request(props) {
                 onChange={(event) => {
                   const selected = event.detail.selectedOption;
                   setSelectedCustomer(selected);
+                  setCustomerError();
                   
                   // Clear account selection when customer changes
                   setAccount([]);
@@ -626,6 +666,7 @@ function Request(props) {
                 selectedOption={role}
                 onChange={(event) => {
                   setRoleError();
+                  setCustomerError();
                   setRole(event.detail.selectedOption);
                 }}
                 selectedAriaLabel="selected"
