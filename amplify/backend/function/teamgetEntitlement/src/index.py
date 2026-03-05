@@ -52,6 +52,8 @@ def publishPolicy(result):
                 accounts {
                 name
                 id
+                customerId
+                customerName
                 }
                 permissions {
                 name
@@ -209,6 +211,7 @@ def handler(event, context):
     request_id = event.get("id")
     eligibility = []
     maxDuration = 0
+    has_customer_scoped_entitlement = False
     
     print("Id: ", event["id"])
     
@@ -226,67 +229,90 @@ def handler(event, context):
         item = entitlement["Item"]
         item_accounts = item.get("accounts", []) or []
         item_ous = item.get("ous", []) or []
-        emit_structured_log(
-            "LEGACY_ENTITLEMENT_PATH_USED",
-            requestId=request_id,
-            principalId=id,
-            username=username,
-            hasCustomerId=bool(item.get("customerId")),
-            customerId=item.get("customerId"),
-            path="legacy_accounts_ou",
-            accountCount=len(item_accounts),
-            ouCount=len(item_ous),
-        )
         duration = entitlement["Item"]["duration"]
         if int(duration) > maxDuration:
             maxDuration = int(duration)
         policy = {}
-        policy["accounts"] = entitlement["Item"]["accounts"]
+        customer_id = item.get("customerId")
+        if customer_id:
+            has_customer_scoped_entitlement = True
+            customer = next(
+                (
+                    current_customer
+                    for current_customer in customers
+                    if current_customer.get("id") == customer_id
+                    and current_customer.get("roleStatus") == "established"
+                ),
+                None,
+            )
+            policy["accounts"] = get_customer_accounts([customer]) if customer else []
+            emit_structured_log(
+                "CUSTOMER_SCOPED_ENTITLEMENT_USED",
+                requestId=request_id,
+                principalId=id,
+                username=username,
+                customerId=customer_id,
+                accountCount=len(policy["accounts"]),
+            )
+        else:
+            emit_structured_log(
+                "LEGACY_ENTITLEMENT_PATH_USED",
+                requestId=request_id,
+                principalId=id,
+                username=username,
+                hasCustomerId=False,
+                customerId=None,
+                path="legacy_accounts_ou",
+                accountCount=len(item_accounts),
+                ouCount=len(item_ous),
+            )
+            policy["accounts"] = entitlement["Item"]["accounts"]
 
-        for ou in entitlement["Item"]["ous"]:
-            data = list_account_for_ou(ou["id"])
-            policy["accounts"].extend(data)
+            for ou in entitlement["Item"]["ous"]:
+                data = list_account_for_ou(ou["id"])
+                policy["accounts"].extend(data)
 
-        # Enrich accounts with customer information
-        policy["accounts"] = enrich_accounts_with_customer_info(policy["accounts"], customers)
+            # Enrich accounts with customer information
+            policy["accounts"] = enrich_accounts_with_customer_info(policy["accounts"], customers)
 
         policy["permissions"] = entitlement["Item"]["permissions"]
         policy["approvalRequired"] = entitlement["Item"]["approvalRequired"]
         policy["duration"] = str(maxDuration)
         eligibility.append(policy)
 
-    # Add multi-tenant customer accounts that are not in SSO eligibility
-    customer_accounts = get_customer_accounts(customers)
-    if customer_accounts:
-        existing_account_ids = set()
-        for policy in eligibility:
-            for acc in policy.get("accounts", []):
-                existing_account_ids.add(acc["id"])
+    # Preserve the legacy global append only for users without any customer-scoped entitlement.
+    if not has_customer_scoped_entitlement:
+        customer_accounts = get_customer_accounts(customers)
+        if customer_accounts:
+            existing_account_ids = set()
+            for policy in eligibility:
+                for acc in policy.get("accounts", []):
+                    existing_account_ids.add(acc["id"])
 
-        new_customer_accounts = [
-            acc for acc in customer_accounts
-            if acc["id"] not in existing_account_ids
-        ]
+            new_customer_accounts = [
+                acc for acc in customer_accounts
+                if acc["id"] not in existing_account_ids
+            ]
 
-        if new_customer_accounts:
-            emit_structured_log(
-                "LEGACY_ENTITLEMENT_PATH_USED",
-                requestId=request_id,
-                principalId=None,
-                username=username,
-                hasCustomerId=False,
-                customerId=None,
-                path="legacy_global_customer_append",
-                appendedAccountCount=len(new_customer_accounts),
-            )
-            customer_policy = {
-                "accounts": new_customer_accounts,
-                "permissions": [],
-                "approvalRequired": False,
-                "duration": str(maxDuration) if maxDuration > 0 else DEFAULT_DURATION
-            }
-            eligibility.append(customer_policy)
-            print(f"Added {len(new_customer_accounts)} multi-tenant customer accounts")
+            if new_customer_accounts:
+                emit_structured_log(
+                    "LEGACY_ENTITLEMENT_PATH_USED",
+                    requestId=request_id,
+                    principalId=None,
+                    username=username,
+                    hasCustomerId=False,
+                    customerId=None,
+                    path="legacy_global_customer_append",
+                    appendedAccountCount=len(new_customer_accounts),
+                )
+                customer_policy = {
+                    "accounts": new_customer_accounts,
+                    "permissions": [],
+                    "approvalRequired": False,
+                    "duration": str(maxDuration) if maxDuration > 0 else DEFAULT_DURATION
+                }
+                eligibility.append(customer_policy)
+                print(f"Added {len(new_customer_accounts)} multi-tenant customer accounts")
 
     result = {"id": event["id"], "policy": eligibility, "username":username}
     print(result)

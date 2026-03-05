@@ -320,6 +320,8 @@ export const onPublishPolicy = /* GraphQL */ `
         accounts {
           name
           id
+          customerId
+          customerName
           __typename
         }
         permissions {

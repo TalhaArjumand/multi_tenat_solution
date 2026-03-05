@@ -14,7 +14,7 @@ import Textarea from "@awsui/components-react/textarea";
 import moment from "moment";
 import { DatePicker } from "antd";
 import "../../index.css";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   getGroupMemberships,
   requestTeam,
@@ -86,6 +86,7 @@ function Request(props) {
   const [customers, setCustomers] = useState([]);
   const [customersLoading, setCustomersLoading] = useState(true);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [policyLoaded, setPolicyLoaded] = useState(false);
 
   const history = useHistory();
 
@@ -176,19 +177,25 @@ function Request(props) {
   function publishEvent() {
     const subscription = API.graphql(graphqlOperation(onPublishPolicy)).subscribe({
       next: (result) => {
-        const policy = result.value.data.onPublishPolicy.policy;
-        if (policy?.length > 0) {
-          setItem(policy);
-          const allAccts = concatenateAccounts(policy);
-          setAllAccounts(allAccts);
-          setAccounts(allAccts);
-        }
+        const policy = result?.value?.data?.onPublishPolicy?.policy;
+        const normalizedPolicy = Array.isArray(policy) ? policy : [];
+        setItem(normalizedPolicy);
+        const allAccts = concatenateAccounts(normalizedPolicy);
+        setAllAccounts(allAccts);
+        setAccounts(allAccts);
+        setPolicyLoaded(true);
         setAccountStatus("finished");
         setPermissionStatus("finished");
         subscription.unsubscribe();
       },
       error: (error) => {
         console.warn(error);
+        setItem([]);
+        setAllAccounts([]);
+        setAccounts([]);
+        setPolicyLoaded(true);
+        setAccountStatus("finished");
+        setPermissionStatus("finished");
         subscription.unsubscribe();
       }
     });
@@ -214,6 +221,73 @@ function Request(props) {
       setCustomersLoading(false);
     }
   }
+
+  const scopedCustomerIds = useMemo(() => {
+    if (!policyLoaded || !item.length || !customers.length) {
+      return [];
+    }
+
+    const scopedIds = new Set();
+
+    item.forEach((policy) => {
+      const policyAccounts = Array.isArray(policy?.accounts)
+        ? policy.accounts.filter((account) => account?.customerId)
+        : [];
+      if (!policyAccounts.length) {
+        return;
+      }
+
+      const customerIds = [...new Set(policyAccounts.map((account) => account.customerId))];
+      if (customerIds.length !== 1) {
+        return;
+      }
+
+      const scopedCustomerId = customerIds[0];
+      const customer = customers.find((candidate) => candidate.id === scopedCustomerId);
+      if (!customer || !Array.isArray(customer.accountIds) || customer.accountIds.length < 1) {
+        return;
+      }
+
+      const customerAccountIds = [...new Set(customer.accountIds)].sort();
+      const policyAccountIds = [...new Set(policyAccounts.map((account) => account.id))].sort();
+
+      if (
+        customerAccountIds.length === policyAccountIds.length &&
+        customerAccountIds.every((accountId, index) => accountId === policyAccountIds[index])
+      ) {
+        scopedIds.add(scopedCustomerId);
+      }
+    });
+
+    return Array.from(scopedIds);
+  }, [customers, item, policyLoaded]);
+
+  const visibleCustomers = useMemo(() => {
+    if (!policyLoaded) {
+      return [];
+    }
+
+    if (scopedCustomerIds.length < 1) {
+      return customers;
+    }
+
+    const scopedSet = new Set(scopedCustomerIds);
+    return customers.filter((customer) => scopedSet.has(customer.id));
+  }, [customers, policyLoaded, scopedCustomerIds]);
+
+  const customerOptions = useMemo(() => {
+    const options = visibleCustomers.map((customer) => ({
+      label: customer.name,
+      value: customer.id,
+      description: `${customer.accountIds?.length || 0} account(s)`,
+    }));
+
+    if (scopedCustomerIds.length > 0) {
+      return options;
+    }
+
+    return [{ label: "All accounts", value: "" }, ...options];
+  }, [scopedCustomerIds.length, visibleCustomers]);
 
   function filterAccountsByCustomer(customerId) {
     if (!customerId) {
@@ -557,19 +631,16 @@ function Request(props) {
               errorText={customerError}
             >
               <Select
-                statusType={customersLoading ? "loading" : "finished"}
-                placeholder="Select a customer (required for multi-tenant roles)"
+                statusType={customersLoading || !policyLoaded ? "loading" : "finished"}
+                placeholder={
+                  scopedCustomerIds.length > 0
+                    ? "Select an allowed customer"
+                    : "Select a customer (required for multi-tenant roles)"
+                }
                 loadingText="Loading customers"
                 filteringType="auto"
-                empty="No customers found"
-                options={[
-                  { label: "All accounts", value: "" },
-                  ...customers.map((customer) => ({
-                    label: customer.name,
-                    value: customer.id,
-                    description: `${customer.accountIds?.length || 0} account(s)`,
-                  }))
-                ]}
+                empty="No eligible customers found"
+                options={customerOptions}
                 selectedOption={selectedCustomer}
                 onChange={(event) => {
                   const selected = event.detail.selectedOption;
