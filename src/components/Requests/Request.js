@@ -362,7 +362,10 @@ function Request(props) {
       setJustificationError("Enter valid business justification");
       error = true;
     }
-    if ((!ticketNo && ticketRequired) || !/^[a-zA-Z0-9]+$/.test(ticketNo[0])) {
+    if (
+      (ticketRequired && !ticketNo) ||
+      (ticketNo && !/^[a-zA-Z0-9]+$/.test(ticketNo))
+    ) {
       setTicketError("Enter valid change management ticket number");
       error = true;
     }
