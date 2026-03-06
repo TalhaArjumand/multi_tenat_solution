@@ -12,23 +12,14 @@ requests_table = dynamodb.Table(os.environ.get('REQUESTS_TABLE_NAME', ''))
 sts_client = boto3.client('sts')
 
 
-def get_customer_by_account_id(account_id):
-    """Scan the Customers table for an established customer containing the given accountId."""
+def get_customer_by_id(customer_id):
+    """Fetch a customer by its authoritative id."""
     try:
-        response = customers_table.scan(
-            FilterExpression='contains(accountIds, :acctId) AND roleStatus = :status',
-            ExpressionAttributeValues={
-                ':acctId': account_id,
-                ':status': 'established'
-            }
-        )
-        items = response.get('Items', [])
-        if items:
-            return items[0]
-        return None
+        response = customers_table.get_item(Key={'id': customer_id})
+        return response.get('Item')
     except Exception as e:
-        print(f"Error scanning Customers table: {e}")
-        return None
+        print(f"Error reading Customers table for {customer_id}: {e}")
+        raise
 
 
 def generate_console_url(credentials):
@@ -68,8 +59,8 @@ def handler(event, context):
     """
     Multi-tenant grant handler. Called by the Grant Step Function.
     If the request is for a multi-tenant customer, assumes the cross-account role
-    and returns credentials. Otherwise, returns isMultiTenant=False so the Step Function
-    falls back to the existing SSO path.
+    and returns credentials. Non-MT requests fall back to the existing SSO path.
+    MT requests must be validated against the authoritative customer context.
     """
     print(f"EVENT: {json.dumps(event)}")
 
@@ -83,17 +74,27 @@ def handler(event, context):
             return {**event, 'isMultiTenant': False, 'useSSO': True}
 
         role_name = role_id.replace('mt-', '')
+        customer_id = event.get('customerId')
+        if not customer_id:
+            raise ValueError('MISSING_CUSTOMER_ID')
 
-        # Look up the customer
-        customer = get_customer_by_account_id(account_id)
+        # Look up the customer using the authoritative request context.
+        customer = get_customer_by_id(customer_id)
         if not customer:
-            print(f"No established customer found for account {account_id}")
-            return {**event, 'isMultiTenant': False, 'useSSO': True}
+            raise ValueError(f'CUSTOMER_NOT_FOUND: {customer_id}')
+
+        if customer.get('roleStatus') != 'established':
+            raise ValueError(f'CUSTOMER_ROLE_NOT_ESTABLISHED: {customer_id}')
+
+        customer_account_ids = [str(customer_account_id) for customer_account_id in (customer.get('accountIds') or [])]
+        if str(account_id) not in customer_account_ids:
+            raise ValueError(
+                f'ACCOUNT_CUSTOMER_MISMATCH: accountId={account_id}, customerId={customer_id}'
+            )
 
         external_id = customer.get('externalId', '')
         if not external_id:
-            print(f"Customer found but no externalId for account {account_id}")
-            return {**event, 'isMultiTenant': False, 'useSSO': True}
+            raise ValueError(f'CUSTOMER_MISSING_EXTERNAL_ID: {customer_id}')
 
         # Build the role ARN
         role_arn = get_role_arn(account_id, role_name)
@@ -138,7 +139,9 @@ def handler(event, context):
             }
         }
 
-        print(f"Successfully assumed role for multi-tenant customer in account {account_id}")
+        print(
+            f"Successfully assumed role for multi-tenant customer {customer_id} in account {account_id}"
+        )
         return result
 
     except ClientError as e:
