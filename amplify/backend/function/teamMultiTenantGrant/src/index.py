@@ -31,20 +31,22 @@ def get_customer_by_account_id(account_id):
         return None
 
 
-def generate_console_url(credentials, session_duration_seconds):
-    """Generate an AWS Console federation URL from STS credentials."""
+def generate_console_url(credentials):
+    """Generate an AWS Console federation URL from STS credentials.
+
+    For assumed-role credentials, omit SessionDuration and let federation
+    inherit the credential expiry.
+    """
     url_creds = {
         'sessionId': credentials['AccessKeyId'],
         'sessionKey': credentials['SecretAccessKey'],
         'sessionToken': credentials['SessionToken']
     }
     json_string = json.dumps(url_creds)
-    session_duration_seconds = max(900, min(int(session_duration_seconds), 43200))
 
     signin_url = (
         "https://signin.aws.amazon.com/federation"
         "?Action=getSigninToken"
-        f"&SessionDuration={session_duration_seconds}"
         f"&Session={urllib.parse.quote_plus(json_string)}"
     )
 
@@ -117,7 +119,7 @@ def handler(event, context):
         creds = assume_response['Credentials']
 
         # Generate console URL
-        console_url = generate_console_url(creds, duration_seconds)
+        console_url = generate_console_url(creds)
 
         # Return enriched event for the Step Function
         result = {

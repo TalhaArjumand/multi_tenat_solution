@@ -13,7 +13,11 @@ sts_client = boto3.client('sts')
 
 
 def generate_console_url(credentials):
-    """Generate an AWS Console federation URL from STS credentials."""
+    """Generate an AWS Console federation URL from STS credentials.
+
+    For assumed-role credentials, omit SessionDuration and let federation
+    inherit the credential expiry.
+    """
     url_creds = {
         'sessionId': credentials['AccessKeyId'],
         'sessionKey': credentials['SecretAccessKey'],
@@ -24,7 +28,6 @@ def generate_console_url(credentials):
     signin_url = (
         "https://signin.aws.amazon.com/federation"
         "?Action=getSigninToken"
-        "&SessionDuration=43200"
         f"&Session={urllib.parse.quote_plus(json_string)}"
     )
 
