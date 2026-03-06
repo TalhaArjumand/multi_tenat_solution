@@ -174,6 +174,12 @@ const defaultStatus = {
   value: "0",
 };
 
+const ACTIVE_STATUS_OPTIONS = [
+  defaultStatus,
+  { label: "in progress", value: "1" },
+  { label: "scheduled", value: "2" },
+];
+
 function Active(props) {
   const [allItems, setAllItems] = useState([]);
   const [preferences, setPreferences] = useState({
@@ -192,28 +198,6 @@ function Active(props) {
   });
 
   const [selectedOption, setSelectedOption] = useState(defaultStatus);
-  const selectStatusOptions = prepareSelectOptions("status", defaultStatus);
-
-  function prepareSelectOptions(field, defaultOption) {
-    const optionSet = [];
-    // Building a non redundant list of the field passed as parameter.
-
-    allItems.forEach((item) => {
-      if (optionSet.indexOf(item[field]) === -1) {
-        optionSet.push(item[field]);
-      }
-    });
-    optionSet.sort();
-
-    // The first element is the default one.
-    const options = [defaultOption];
-
-    // Adding the other element ot the list.
-    optionSet.forEach((item, index) =>
-      options.push({ label: item, value: (index + 1).toString() })
-    );
-    return options;
-  }
 
   function matchesStatus(item, selectedStatus) {
     return (
@@ -489,7 +473,7 @@ function Active(props) {
               {...filterProps}
               className="select-filter engine-filter"
               selectedAriaLabel="Selected"
-              options={selectStatusOptions}
+              options={ACTIVE_STATUS_OPTIONS}
               selectedOption={selectedOption}
               onChange={({ detail }) =>
                 setSelectedOption(detail.selectedOption)
