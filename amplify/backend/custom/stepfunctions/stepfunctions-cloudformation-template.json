@@ -64,7 +64,7 @@
                   "ErrorEquals": [
                     "States.ALL"
                   ],
-                  "Next": "Update Request Status - in progress",
+                  "Next": "Update Request Status - error",
                   "ResultPath": "$.statusError"
                 }
               ],
@@ -87,7 +87,7 @@
                   "ErrorEquals": [
                     "States.ALL"
                   ],
-                  "Next": "Update Request Status - in progress",
+                  "Next": "Update Request Status - error",
                   "ResultPath": "$.statusError"
                 }
               ],
@@ -119,6 +119,29 @@
             },
             "Update Request Status - in progress": {
               "Next": "DynamoDB UpdateStartTime",
+              "Parameters": {
+                "FunctionName.$": "$.fn_teamstatus_arn",
+                "Payload.$": "$"
+              },
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "ResultPath": "$.lastTaskResult",
+              "Retry": [
+                {
+                  "BackoffRate": 2,
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException",
+                    "Lambda.TooManyRequestsException"
+                  ],
+                  "IntervalSeconds": 2,
+                  "MaxAttempts": 6
+                }
+              ],
+              "Type": "Task"
+            },
+            "Update Request Status - error": {
+              "Next": "Notify Error",
               "Parameters": {
                 "FunctionName.$": "$.fn_teamstatus_arn",
                 "Payload.$": "$"
