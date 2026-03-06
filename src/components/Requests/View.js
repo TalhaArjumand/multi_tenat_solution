@@ -297,18 +297,7 @@ function View(props) {
 
   async function updateItems(items) {
     items.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
-    const data = items.map((item) => {
-      if (
-        item.status === "ended" ||
-        item.status === "revoked" ||
-        item.status === "in progress" ||
-        item.status === "scheduled"
-      ) {
-        item.status = "approved";
-      }
-      return item;
-    });
-    return data;
+    return items;
   }
 
   function views() {
