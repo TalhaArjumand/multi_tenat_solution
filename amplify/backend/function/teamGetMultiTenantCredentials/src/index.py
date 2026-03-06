@@ -12,6 +12,18 @@ requests_table = dynamodb.Table(os.environ.get('REQUESTS_TABLE', ''))
 sts_client = boto3.client('sts')
 
 
+def normalize_identity(raw_value):
+    """Normalize Cognito/AppSync identity variants to a canonical idc_* form."""
+    value = (raw_value or '').strip().lower()
+    if not value:
+        return ''
+    if '::' in value:
+        value = value.split('::')[-1]
+    if value.startswith('idc_'):
+        return value
+    return value
+
+
 def generate_console_url(credentials):
     """Generate an AWS Console federation URL from STS credentials.
 
@@ -56,7 +68,8 @@ def handler(event, context):
         args = event.get('arguments', event)
         request_id = args.get('requestId')
         access_type = args.get('accessType', 'console')
-        username = event.get('identity', {}).get('username', '')
+        identity = event.get('identity', {}) or {}
+        username = identity.get('username', '')
 
         if not request_id:
             return {'error': 'requestId is required'}
@@ -67,8 +80,21 @@ def handler(event, context):
         if not request:
             return {'error': 'Request not found'}
 
-        # Verify the requester owns this request
-        if request.get('owner') != username and username not in (request.get('approver_ids') or []):
+        # Verify the requester owns this request or is an approver.
+        caller_ids = {
+            normalize_identity(username),
+            normalize_identity(identity.get('claims', {}).get('cognito:username', '')),
+        }
+        caller_ids.discard('')
+
+        owner_id = normalize_identity(request.get('owner'))
+        requester_id = normalize_identity(request.get('username'))
+        approver_ids = {
+            normalize_identity(approver_id) for approver_id in (request.get('approver_ids') or [])
+        }
+        approver_ids.discard('')
+
+        if not ((owner_id and owner_id in caller_ids) or (requester_id and requester_id in caller_ids) or caller_ids.intersection(approver_ids)):
             return {'error': 'Unauthorized'}
 
         # Verify request is active
