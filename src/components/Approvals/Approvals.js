@@ -19,7 +19,7 @@ import {
   ColumnLayout,
 } from "@awsui/components-react";
 import { useCollection } from "@awsui/collection-hooks";
-import { API, graphqlOperation } from "aws-amplify";
+import { API, graphqlOperation, Auth } from "aws-amplify";
 import {
   onUpdateRequests,
   onCreateRequests,
@@ -230,30 +230,102 @@ function Approvals(props) {
   const [commentError, setCommentError] = useState();
   const [modalHeader, setmodalHeader] = useState("TEAM");
   const [commentRequired, setCommentRequired] = useState(true);
+  const [approverId, setApproverId] = useState("");
 
+  function normalizeApproverId(rawIdentity) {
+    let normalizedIdentity = (rawIdentity || "").toLowerCase().trim();
+    if (!normalizedIdentity) {
+      return "";
+    }
+    if (normalizedIdentity.includes("::")) {
+      normalizedIdentity = normalizedIdentity.split("::").pop();
+    }
+    if (normalizedIdentity.includes("@")) {
+      normalizedIdentity = normalizedIdentity.split("@")[0];
+    }
+    if (normalizedIdentity && !normalizedIdentity.startsWith("idc_")) {
+      normalizedIdentity = `idc_${normalizedIdentity}`;
+    }
+    return normalizedIdentity;
+  }
+
+  async function getCurrentApproverId() {
+    try {
+      const userData = await Auth.currentAuthenticatedUser();
+      const payload = userData?.signInUserSession?.idToken?.payload || {};
+      const rawIdentity = payload["cognito:username"] || userData?.username || "";
+      return normalizeApproverId(rawIdentity);
+    } catch (error) {
+      console.warn("Unable to resolve approver identity", error);
+      return "";
+    }
+  }
 
   useEffect(() => {
-    views();
+    initializeApprovals();
     props.addNotification([]);
     approveEvent();
     getSettings()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function views() {
-    let filter = {
-      and: [{ email: { ne: props.user } }, { status: { eq: "pending" } }, { approvers: { contains: props.user } }],
-    };
-    sessions(filter).then((items) => {
-      items.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-      setAllItems(items);
-      setTableLoading(false);
-      setConfirmLoading(false);
-      setVisible(false);
-      setRefreshLoading(false);
-      setComment();
-    });
+  async function initializeApprovals() {
+    const resolvedApproverId = await getCurrentApproverId();
+    setApproverId(resolvedApproverId);
+    views(resolvedApproverId);
   }
+
+  async function views(currentApproverId = approverId) {
+    const primaryFilter = currentApproverId
+      ? {
+          and: [
+            { email: { ne: props.user } },
+            { status: { eq: "pending" } },
+            { approver_ids: { contains: currentApproverId } },
+          ],
+        }
+      : null;
+    const fallbackFilter = {
+      and: [
+        { email: { ne: props.user } },
+        { status: { eq: "pending" } },
+        { approvers: { contains: props.user } },
+      ],
+    };
+
+    let items = [];
+    let filterPath = "legacy_email";
+
+    if (primaryFilter) {
+      const primaryItems = await sessions(primaryFilter);
+      if (Array.isArray(primaryItems) && primaryItems.length > 0) {
+        items = primaryItems;
+        filterPath = "model_b_approver_ids";
+      } else {
+        const fallbackItems = await sessions(fallbackFilter);
+        items = Array.isArray(fallbackItems) ? fallbackItems : [];
+      }
+    } else {
+      const fallbackItems = await sessions(fallbackFilter);
+      items = Array.isArray(fallbackItems) ? fallbackItems : [];
+    }
+
+    console.info("Approvals inbox filter path", {
+      path: filterPath,
+      approverId: currentApproverId || null,
+      email: props.user,
+      itemCount: items.length,
+    });
+
+    items.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    setAllItems(items);
+    setTableLoading(false);
+    setConfirmLoading(false);
+    setVisible(false);
+    setRefreshLoading(false);
+    setComment();
+  }
+
   function getSettings(){
     getSetting("settings").then((data) => {
       if (data !== null) {
