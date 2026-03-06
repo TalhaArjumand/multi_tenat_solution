@@ -76,20 +76,26 @@ def handler(event, context):
         role_id = request.get('roleId', '')
         role_name = role_id.replace('mt-', '') if role_id.startswith('mt-') else role_id
 
-        # Get customer for this account
-        scan_response = customers_table.scan(
-            FilterExpression='contains(accountIds, :acctId) AND roleStatus = :status',
-            ExpressionAttributeValues={
-                ':acctId': account_id,
-                ':status': 'established'
-            }
-        )
+        # Use the request's authoritative customer context instead of scanning by account.
+        customer_id = request.get('customerId')
+        if not customer_id:
+            return {'error': 'Request is missing customerId'}
 
-        if not scan_response.get('Items'):
-            return {'error': f'No established customer found for account {account_id}'}
+        customer_response = customers_table.get_item(Key={'id': customer_id})
+        customer = customer_response.get('Item')
+        if not customer:
+            return {'error': f'Customer not found (customerId: {customer_id})'}
 
-        customer = scan_response['Items'][0]
-        external_id = customer['externalId']
+        if customer.get('roleStatus') != 'established':
+            return {'error': f'Customer role is not established (customerId: {customer_id})'}
+
+        account_ids = [str(customer_account_id) for customer_account_id in (customer.get('accountIds') or [])]
+        if str(account_id) not in account_ids:
+            return {'error': f'Account/customer mismatch (accountId: {account_id}, customerId: {customer_id})'}
+
+        external_id = customer.get('externalId')
+        if not external_id:
+            return {'error': f'Customer missing externalId (customerId: {customer_id})'}
 
         # Build role ARN
         role_arn = get_role_arn(account_id, role_name)
