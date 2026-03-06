@@ -37,10 +37,7 @@ function Details(props) {
     </div>
   );
 
-  const startTime = props.item.startTime
-    ? convertAwsDateTime(props.item.startTime)
-    : "-";
-  const errorReason = props.item.statusErrorMessage || props.item.statusErrorCode;
+  const startTime = convertAwsDateTime(props.item.startTime)
 
   return (
     <SpaceBetween size="s">
@@ -80,23 +77,6 @@ function Details(props) {
       </ColumnLayout>
 
       <div>
-        {props.item.status === "error" && errorReason && (
-          <div>
-            <Divider style={{ marginBottom: "10px", marginTop: "10px" }} />
-            <ColumnLayout columns={3}>
-              <SpaceBetween size="m">
-                <ValueWithLabel
-                  label="Error code"
-                  children={`${props.item.statusErrorCode || "-"}`}
-                />
-                <ValueWithLabel
-                  label="Error reason"
-                  children={`${errorReason}`}
-                />
-              </SpaceBetween>
-            </ColumnLayout>
-          </div>
-        )}
         {props.item.approver && (
           <div>
             <Divider style={{ marginBottom: "10px", marginTop: "10px" }} />

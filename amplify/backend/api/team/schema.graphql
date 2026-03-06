@@ -27,7 +27,7 @@ type requests
   accountName: String!
   role: String!
   roleId: String!
-  startTime: AWSDateTime
+  startTime: AWSDateTime!
   duration: String!
   justification: String
   status: String
@@ -48,8 +48,6 @@ type requests
       { allow: private, provider: iam, operations: [read, update] }
     ]
   )
-  statusErrorCode: String
-  statusErrorMessage: String
   username: String
   approver: String
   @auth(
@@ -518,3 +516,4 @@ type Query {
     @function(name: "teamGetMultiTenantCredentials-${env}")
     @auth(rules: [{ allow: private }])
 }
+
