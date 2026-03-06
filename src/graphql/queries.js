@@ -15,6 +15,8 @@ export const getRequests = /* GraphQL */ `
       justification
       status
       comment
+      statusErrorCode
+      statusErrorMessage
       username
       approver
       approverId
@@ -54,6 +56,8 @@ export const listRequests = /* GraphQL */ `
         justification
         status
         comment
+        statusErrorCode
+        statusErrorMessage
         username
         approver
         approverId
@@ -106,6 +110,8 @@ export const requestByEmailAndStatus = /* GraphQL */ `
         justification
         status
         comment
+        statusErrorCode
+        statusErrorMessage
         username
         approver
         approverId
@@ -158,6 +164,8 @@ export const requestByApproverAndStatus = /* GraphQL */ `
         justification
         status
         comment
+        statusErrorCode
+        statusErrorMessage
         username
         approver
         approverId

@@ -32,6 +32,8 @@ const query = /* GraphQL */ `
             justification
             status
             comment
+            statusErrorCode
+            statusErrorMessage
             username
             approver
             approverId
@@ -53,12 +55,51 @@ const query = /* GraphQL */ `
  * @type {import('@types/aws-lambda').APIGatewayProxyHandler}
  */
 
-const updateItem = async (id, status) => {
+const parseStatusError = (statusError) => {
+    if (!statusError) {
+      return {};
+    }
+
+    let code = statusError.Error || "ERROR";
+    let message = statusError.Cause || statusError.Error || "Request failed";
+
+    if (typeof statusError.Cause === "string") {
+      try {
+        const parsedCause = JSON.parse(statusError.Cause);
+        if (parsedCause?.errorMessage) {
+          message = parsedCause.errorMessage;
+          const prefixedCode = parsedCause.errorMessage.match(/^([A-Z0-9_]+)(?::|$)/);
+          if (prefixedCode) {
+            code = prefixedCode[1];
+          } else if (parsedCause.errorType && /^[A-Z0-9_]+$/.test(parsedCause.errorType)) {
+            code = parsedCause.errorType;
+          }
+        }
+      } catch (error) {
+        const prefixedCode = statusError.Cause.match(/^([A-Z0-9_]+)(?::|$)/);
+        if (prefixedCode) {
+          code = prefixedCode[1];
+          message = statusError.Cause;
+        }
+      }
+    }
+
+    return {
+      statusErrorCode: String(code || "ERROR").slice(0, 120),
+      statusErrorMessage: String(message || "Request failed").slice(0, 500),
+    };
+  };
+
+const updateItem = async (id, status, statusError) => {
     const variables = {
       input: {
         id: id,
         status: status
       } 
+    }
+
+    if (statusError) {
+      Object.assign(variables.input, parseStatusError(statusError));
     }
   
     const endpoint = new URL(GRAPHQL_ENDPOINT);
@@ -134,6 +175,6 @@ export const handler = async (event) => {
     }else if (status === "pending") {
       status = "expired";
     }
-    const response = await updateItem (id, status);
+    const response = await updateItem(id, status, event.statusError);
     return response;
 };

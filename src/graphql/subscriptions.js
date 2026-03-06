@@ -243,6 +243,8 @@ export const onUpdateRequests = /* GraphQL */ `
       justification
       status
       comment
+      statusErrorCode
+      statusErrorMessage
       username
       approver
       approverId
@@ -275,6 +277,8 @@ export const onCreateRequests = /* GraphQL */ `
       justification
       status
       comment
+      statusErrorCode
+      statusErrorMessage
       username
       approver
       approverId
