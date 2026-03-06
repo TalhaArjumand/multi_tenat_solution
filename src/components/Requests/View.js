@@ -80,7 +80,7 @@ const COLUMN_DEFINITIONS = [
     id: "startTime",
     sortingField: "startTime",
     header: "StartTime",
-    cell: (item) => convertAwsDateTime(item.startTime),
+    cell: (item) => (item.startTime ? convertAwsDateTime(item.startTime) : "-"),
     minWidth: 160,
   },
   {

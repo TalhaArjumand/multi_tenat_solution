@@ -27,7 +27,7 @@ type requests
   accountName: String!
   role: String!
   roleId: String!
-  startTime: AWSDateTime!
+  startTime: AWSDateTime
   duration: String!
   justification: String
   status: String
