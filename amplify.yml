@@ -1,0 +1,28 @@
+version: 1
+backend:
+  phases:
+    preBuild:
+      commands:
+        - 'if [ "${RUN_BACKEND}" = "true" ]; then npm i -g @aws-amplify/cli@14.0.0; else echo "Skipping backend preBuild (RUN_BACKEND!=true)"; fi'
+        - 'if [ "${RUN_BACKEND}" = "true" ]; then node parameters.js; else true; fi'
+    build:
+      commands:
+        - 'if [ "${RUN_BACKEND}" = "true" ]; then npm i -S graphql-ttl-transformer; else echo "Skipping backend build (RUN_BACKEND!=true)"; fi'
+        - 'if [ "${RUN_BACKEND}" = "true" ]; then pip3 install --user pipenv==2023.6.12; else true; fi'
+        - 'if [ "${RUN_BACKEND}" = "true" ]; then export PATH=$HOME/.local/bin:$PATH && amplifyPush --simple --allow-destructive-graphql-schema-update; else true; fi'
+
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+    build:
+      commands:
+        - npm run build
+  artifacts:
+    baseDirectory: build
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
