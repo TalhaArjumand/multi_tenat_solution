@@ -5,10 +5,12 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Auth, Hub } from "aws-amplify";
 import { Spin, Layout } from "antd";
-import { BrowserRouter, Switch, Route } from "react-router-dom";
+import { BrowserRouter, Switch, Route, Redirect } from "react-router-dom";
 import Nav from "./components/Navigation/Nav";
 import SignInIdp from "./components/Navigation/SignInIdp";
 import CustomerApprovalPage from "./components/CustomerApproval/CustomerApprovalPage";
+import CustomerDashboard from "./components/CustomerPortal/CustomerDashboard";
+import CustomerError from "./components/CustomerPortal/CustomerError";
 import logo from "./media/logo-transparent.png";
 import "./index.css";
 import "./signin-page.css";
@@ -50,12 +52,23 @@ function App() {
   const [groupIds, setGroupIds] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showIdpStep, setShowIdpStep] = useState(false);
+  const [customerId, setCustomerId] = useState(null);
+  const [customerAuthError, setCustomerAuthError] = useState(null);
+  const [userType, setUserType] = useState(null);
 
   async function getUser() {
     try {
       const userData = await Auth.currentAuthenticatedUser();
       return userData;
     } catch {
+      setUser(null);
+      setGroups(null);
+      setcognitoGroups([]);
+      setUserId(null);
+      setGroupIds(null);
+      setCustomerId(null);
+      setCustomerAuthError(null);
+      setUserType(null);
       setLoading(false);
       return console.log("Not signed in");
     }
@@ -63,9 +76,28 @@ function App() {
 
   const setData = useCallback(() => {
     getUser().then((userData) => {
+      if (!userData) {
+        return;
+      }
       setUser(userData);
       const payload = userData.signInUserSession.idToken.payload;
-      setcognitoGroups(payload["cognito:groups"]);
+      const isCustomer = payload["custom:userType"] === "customer";
+      const resolvedCustomerId = payload["custom:customerId"] || null;
+      const authError = payload["custom:authError"] || null;
+      setUserType(payload["custom:userType"] || null);
+      setCustomerId(resolvedCustomerId);
+      setCustomerAuthError(authError);
+
+      if (isCustomer) {
+        setcognitoGroups(payload["cognito:groups"] || []);
+        setUserId(null);
+        setGroupIds(null);
+        setGroups(null);
+        setLoading(false);
+        return;
+      }
+
+      setcognitoGroups(payload["cognito:groups"] || []);
       setUserId(payload.userId);
       setGroupIds((payload.groupIds).split(','));
       setGroups((payload.groups).split(','));
@@ -100,13 +132,44 @@ function App() {
     setData();
   }, [setData]);
 
+  const pathname = window.location.pathname;
+  const isCustomerRoute = pathname === "/customer" || pathname === "/customer-setup" || pathname.startsWith("/customer/");
+  const isCustomer = userType === "customer";
+
   return (
     <BrowserRouter>
       <Switch>
         <Route path="/customer-approval" exact component={CustomerApprovalPage} />
         <Route path="*">
           <div>
-            {groups ? (
+            {loading ? (
+              <Home loading={loading} onGoToIdp={() => setShowIdpStep(true)} />
+            ) : isCustomer ? (
+              !customerId ? (
+                pathname === "/customer/error" ? (
+                  <CustomerError authError={customerAuthError} customerId={customerId} />
+                ) : (
+                  <Redirect to="/customer/error" />
+                )
+              ) : !isCustomerRoute ? (
+                <Redirect to="/customer" />
+              ) : (
+                <Switch>
+                  <Route path="/customer/error">
+                    <CustomerError authError={customerAuthError} customerId={customerId} />
+                  </Route>
+                  <Route path="/customer-setup">
+                    <CustomerDashboard customerId={customerId} mode="setup" />
+                  </Route>
+                  <Route path="/customer">
+                    <CustomerDashboard customerId={customerId} />
+                  </Route>
+                  <Redirect to="/customer" />
+                </Switch>
+              )
+            ) : isCustomerRoute ? (
+              <Redirect to="/" />
+            ) : groups ? (
               <Nav
                 user={user}
                 groupIds={groupIds}
