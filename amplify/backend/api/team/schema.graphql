@@ -222,6 +222,16 @@ type Customers
   roleEstablishedAt: AWSDateTime
   lastRoleVerification: AWSDateTime
   roleVerificationError: String
+  portalUserEmail: String
+  portalUserSub: String
+  portalUserStatus: String
+  portalUserCreatedAt: AWSDateTime
+  portalInviteTokenHash: String @index(name: "byPortalInviteTokenHash")
+  portalInviteExpiresAt: AWSDateTime
+  portalInviteSentAt: AWSDateTime
+  portalInviteStatus: String
+  portalInviteError: String
+  portalProvisioningVersion: String
 }
 type data @aws_iam @aws_cognito_user_pools {
   name: String
@@ -516,4 +526,3 @@ type Query {
     @function(name: "teamGetMultiTenantCredentials-${env}")
     @auth(rules: [{ allow: private }])
 }
-

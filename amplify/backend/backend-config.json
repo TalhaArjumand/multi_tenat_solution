@@ -419,6 +419,35 @@
           ],
           "category": "api",
           "resourceName": "team"
+        },
+        {
+          "attributes": [
+            "Name"
+          ],
+          "category": "function",
+          "resourceName": "teamProvisionCustomerPortalAccess"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
+    "teamProvisionCustomerPortalAccess": {
+      "build": true,
+      "dependsOn": [
+        {
+          "attributes": [
+            "GraphQLAPIIdOutput",
+            "GraphQLAPIEndpointOutput"
+          ],
+          "category": "api",
+          "resourceName": "team"
+        },
+        {
+          "attributes": [
+            "UserPoolId"
+          ],
+          "category": "auth",
+          "resourceName": "team06dbb7fc"
         }
       ],
       "providerPlugin": "awscloudformation",
@@ -843,6 +872,22 @@
         {
           "category": "function",
           "resourceName": "teamVerifyCustomerRole"
+        }
+      ]
+    },
+    "AMPLIFY_function_teamProvisionCustomerPortalAccess_deploymentBucketName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "teamProvisionCustomerPortalAccess"
+        }
+      ]
+    },
+    "AMPLIFY_function_teamProvisionCustomerPortalAccess_s3Key": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "teamProvisionCustomerPortalAccess"
         }
       ]
     },

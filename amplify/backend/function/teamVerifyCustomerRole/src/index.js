@@ -11,12 +11,15 @@ import { SignatureV4 } from '@aws-sdk/signature-v4';
 import { HttpRequest } from '@aws-sdk/protocol-http';
 import { default as fetch, Request } from 'node-fetch';
 import { STSClient, AssumeRoleCommand } from '@aws-sdk/client-sts';
+import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 
 const { Sha256 } = crypto;
 const REGION = process.env.REGION;
 const GRAPHQL_ENDPOINT = process.env.API_TEAM_GRAPHQLAPIENDPOINTOUTPUT;
+const PROVISION_CUSTOMER_PORTAL_FUNCTION = process.env.FUNCTION_TEAMPROVISIONCUSTOMERPORTALACCESS_NAME;
 
 const stsClient = new STSClient({ region: REGION });
+const lambdaClient = new LambdaClient({ region: REGION });
 
 const updateCustomerMutation = /* GraphQL */ `
   mutation UpdateCustomers(
@@ -152,6 +155,21 @@ export const handler = async (event) => {
       };
       
       await graphqlRequest(updateCustomerMutation, { input: updateInput });
+
+      if (PROVISION_CUSTOMER_PORTAL_FUNCTION) {
+        try {
+          await lambdaClient.send(new InvokeCommand({
+            FunctionName: PROVISION_CUSTOMER_PORTAL_FUNCTION,
+            InvocationType: 'Event',
+            Payload: JSON.stringify({ customerId })
+          }));
+          console.log(`Provisioning portal access for customer ${customerId}`);
+        } catch (invokeError) {
+          console.error('Failed to invoke customer portal provisioning:', invokeError);
+        }
+      } else {
+        console.warn('FUNCTION_TEAMPROVISIONCUSTOMERPORTALACCESS_NAME is not configured');
+      }
       
       console.log(`Customer ${customerId} role verified successfully`);
       

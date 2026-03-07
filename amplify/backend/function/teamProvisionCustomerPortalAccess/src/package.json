@@ -1,8 +1,8 @@
 {
-  "name": "teamverifycustomerrole",
+  "name": "teamprovisioncustomerportalaccess",
   "type": "module",
   "version": "1.0.0",
-  "description": "Lambda function to verify customer IAM role via AssumeRole",
+  "description": "Lambda function to provision customer portal access and send invite email",
   "main": "index.js",
   "license": "Apache-2.0",
   "devDependencies": {
@@ -13,8 +13,8 @@
   },
   "author": "",
   "dependencies": {
-    "@aws-sdk/client-lambda": "^3.300.0",
-    "@aws-sdk/client-sts": "^3.300.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.300.0",
+    "@aws-sdk/client-ses": "^3.300.0",
     "@aws-crypto/sha256-js": "^2.0.1",
     "@aws-sdk/credential-provider-node": "^3.300.0",
     "@aws-sdk/protocol-http": "^3.300.0",
