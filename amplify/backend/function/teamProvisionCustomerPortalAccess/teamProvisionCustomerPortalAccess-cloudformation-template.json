@@ -280,7 +280,24 @@
                 }
               ],
               "Effect": "Allow"
-            },
+            }
+          ]
+        },
+        "Roles": [
+          {
+            "Ref": "LambdaExecutionRole"
+          }
+        ]
+      },
+      "DependsOn": "LambdaExecutionRole"
+    },
+    "PortalCognitoAdminPolicy": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyName": "portal-cognito-admin",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
             {
               "Action": [
                 "cognito-idp:AdminCreateUser",
