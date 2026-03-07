@@ -3,10 +3,9 @@
 // http://aws.amazon.com/agreement or other written agreement between Customer and either
 // Amazon Web Services, Inc. or Amazon Web Services EMEA SARL or both.
 import React, { useEffect, useState, useCallback } from "react";
-import { Amplify, Auth, Hub } from "aws-amplify";
+import { Auth, Hub } from "aws-amplify";
 import { Spin, Layout } from "antd";
 import { BrowserRouter, Switch, Route } from "react-router-dom";
-import awsconfig from "./aws-exports";
 import Nav from "./components/Navigation/Nav";
 import SignInIdp from "./components/Navigation/SignInIdp";
 import CustomerApprovalPage from "./components/CustomerApproval/CustomerApprovalPage";
@@ -15,8 +14,6 @@ import "./index.css";
 import "./signin-page.css";
 
 const { Content } = Layout;
-
-Amplify.configure(awsconfig);
 
 function Home(props) {
   return (
