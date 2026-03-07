@@ -259,38 +259,6 @@
         }
       }
     },
-    "CustomLambdaExecutionPolicy": {
-      "Type": "AWS::IAM::Policy",
-      "Properties": {
-        "PolicyName": "custom-lambda-execution-policy",
-        "PolicyDocument": {
-          "Version": "2012-10-17",
-          "Statement": [
-            {
-              "Action": [
-                "ses:SendEmail",
-                "ses:SendRawEmail"
-              ],
-              "Resource": [
-                {
-                  "Fn::Sub": "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/*"
-                },
-                {
-                  "Fn::Sub": "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:configuration-set/*"
-                }
-              ],
-              "Effect": "Allow"
-            }
-          ]
-        },
-        "Roles": [
-          {
-            "Ref": "LambdaExecutionRole"
-          }
-        ]
-      },
-      "DependsOn": "LambdaExecutionRole"
-    },
     "PortalCognitoAdminPolicy": {
       "Type": "AWS::IAM::Policy",
       "Properties": {
@@ -307,6 +275,32 @@
               ],
               "Resource": {
                 "Fn::Sub": "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${authteam06dbb7fcUserPoolId}"
+              },
+              "Effect": "Allow"
+            }
+          ]
+        },
+        "Roles": [
+          {
+            "Ref": "LambdaExecutionRole"
+          }
+        ]
+      },
+      "DependsOn": "LambdaExecutionRole"
+    },
+    "PortalSesSendPolicy": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyName": "portal-ses-send",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": [
+                "ses:SendEmail"
+              ],
+              "Resource": {
+                "Fn::Sub": "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/info@sfproject.com.pk"
               },
               "Effect": "Allow"
             }
