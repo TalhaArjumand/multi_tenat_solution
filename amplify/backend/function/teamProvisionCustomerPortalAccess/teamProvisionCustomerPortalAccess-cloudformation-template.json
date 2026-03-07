@@ -304,6 +304,9 @@
                   "Fn::Sub": "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/info@sfproject.com.pk"
                 },
                 {
+                  "Fn::Sub": "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/sales@sfproject.com.pk"
+                },
+                {
                   "Fn::Sub": "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/sfproject.com.pk"
                 },
                 {
