@@ -214,6 +214,12 @@ No password is included in this email. If you did not expect this email, contact
 }
 
 async function sendPortalInvite(recipientEmail, emailContent) {
+  structuredLog('CUSTOMER_PORTAL_INVITE_SEND_REQUEST', {
+    source: SENDER_EMAIL,
+    recipientEmail,
+    configurationSetName: null
+  });
+
   const command = new SendEmailCommand({
     Source: SENDER_EMAIL,
     Destination: {
