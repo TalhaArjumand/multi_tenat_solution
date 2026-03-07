@@ -98,6 +98,12 @@
                 "Fn::Sub": "${apiteamGraphQLAPIIdOutput}:GetAtt:SettingsTable:Name"
               }
             },
+            "CUSTOMERS_TABLE_NAME": {
+              "Fn::ImportValue": {
+                "Fn::Sub": "${apiteamGraphQLAPIIdOutput}:GetAtt:CustomersTable:Name"
+              }
+            },
+            "CUSTOMER_APP_CLIENT_ID": "57n8njdqivsd80pbn27e5s42ks",
             "TEAM_ADMIN_GROUP": {
               "Ref": "teamAdminGroup"
             },
@@ -203,6 +209,22 @@
               "Resource": [
                 {
                   "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Settings-*"
+                }
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "dynamodb:Scan",
+                "dynamodb:GetItem",
+                "dynamodb:Query"
+              ],
+              "Resource": [
+                {
+                  "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Customers-*"
+                },
+                {
+                  "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Customers-*/index/*"
                 }
               ]
             }
