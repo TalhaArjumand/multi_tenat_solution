@@ -453,6 +453,41 @@
       "providerPlugin": "awscloudformation",
       "service": "Lambda"
     },
+    "teamGetCustomerPortalSetup": {
+      "build": true,
+      "dependsOn": [
+        {
+          "attributes": [
+            "GraphQLAPIIdOutput"
+          ],
+          "category": "api",
+          "resourceName": "team"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
+    "teamCompleteCustomerPortalSetup": {
+      "build": true,
+      "dependsOn": [
+        {
+          "attributes": [
+            "GraphQLAPIIdOutput"
+          ],
+          "category": "api",
+          "resourceName": "team"
+        },
+        {
+          "attributes": [
+            "UserPoolId"
+          ],
+          "category": "auth",
+          "resourceName": "team06dbb7fc"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
     "teamSendCustomerInvitation": {
       "build": true,
       "dependsOn": [
@@ -888,6 +923,38 @@
         {
           "category": "function",
           "resourceName": "teamProvisionCustomerPortalAccess"
+        }
+      ]
+    },
+    "AMPLIFY_function_teamGetCustomerPortalSetup_deploymentBucketName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "teamGetCustomerPortalSetup"
+        }
+      ]
+    },
+    "AMPLIFY_function_teamGetCustomerPortalSetup_s3Key": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "teamGetCustomerPortalSetup"
+        }
+      ]
+    },
+    "AMPLIFY_function_teamCompleteCustomerPortalSetup_deploymentBucketName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "teamCompleteCustomerPortalSetup"
+        }
+      ]
+    },
+    "AMPLIFY_function_teamCompleteCustomerPortalSetup_s3Key": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "teamCompleteCustomerPortalSetup"
         }
       ]
     },

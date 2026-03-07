@@ -231,6 +231,7 @@ type Customers
   portalInviteSentAt: AWSDateTime
   portalInviteStatus: String
   portalInviteError: String
+  portalInviteConsumedAt: AWSDateTime
   portalProvisioningVersion: String
 }
 type data @aws_iam @aws_cognito_user_pools {
@@ -363,6 +364,12 @@ type Mutation {
   @auth(rules: [{ allow: private, provider: iam} { allow: private }])
   publishPermissions(result: PermissionInput): Permission
   @auth(rules: [{ allow: private, provider: iam} { allow: private }])
+  completeCustomerPortalSetup(
+    inviteToken: String!
+    password: String!
+  ): CustomerPortalSetupResult
+  @function(name: "teamCompleteCustomerPortalSetup-${env}")
+  @auth(rules: [{ allow: public, provider: iam }])
 }
 
 type Subscription {
@@ -427,6 +434,29 @@ type InvitationActionResponse @aws_iam @aws_cognito_user_pools {
   approvedAt: String
   cloudFormationTemplate: String
   error: String
+}
+
+type CustomerPortalSetupResponse @aws_iam @aws_cognito_user_pools {
+  success: Boolean
+  customerId: String
+  customerName: String
+  portalUserEmail: String
+  portalInviteStatus: String
+  portalInviteExpiresAt: String
+  portalInviteConsumedAt: String
+  error: String
+  errorCode: String
+}
+
+type CustomerPortalSetupResult @aws_iam @aws_cognito_user_pools {
+  success: Boolean
+  customerId: String
+  customerName: String
+  portalUserEmail: String
+  portalInviteStatus: String
+  portalInviteConsumedAt: String
+  error: String
+  errorCode: String
 }
 
 type MultiTenantCredentialsResponse @aws_iam @aws_cognito_user_pools {
@@ -518,6 +548,11 @@ type Query {
     reason: String
   ): InvitationActionResponse
     @function(name: "teamRejectInvitation-${env}")
+    @auth(rules: [{ allow: public, provider: iam }])
+  getCustomerPortalSetup(
+    inviteToken: String!
+  ): CustomerPortalSetupResponse
+    @function(name: "teamGetCustomerPortalSetup-${env}")
     @auth(rules: [{ allow: public, provider: iam }])
   getMultiTenantCredentials(
     requestId: String!
