@@ -11,6 +11,8 @@ import SignInIdp from "./components/Navigation/SignInIdp";
 import CustomerApprovalPage from "./components/CustomerApproval/CustomerApprovalPage";
 import CustomerDashboard from "./components/CustomerPortal/CustomerDashboard";
 import CustomerError from "./components/CustomerPortal/CustomerError";
+import CustomerPortalPaused from "./components/CustomerPortal/CustomerPortalPaused";
+import { CUSTOMER_PORTAL_ENABLED } from "./config/features";
 import logo from "./media/logo-transparent.png";
 import "./index.css";
 import "./signin-page.css";
@@ -142,7 +144,9 @@ function App() {
         <Route path="/customer-approval" exact component={CustomerApprovalPage} />
         <Route path="*">
           <div>
-            {loading ? (
+            {!CUSTOMER_PORTAL_ENABLED && isCustomerRoute ? (
+              <CustomerPortalPaused />
+            ) : loading ? (
               <Home loading={loading} onGoToIdp={() => setShowIdpStep(true)} />
             ) : isCustomer ? (
               !customerId ? (

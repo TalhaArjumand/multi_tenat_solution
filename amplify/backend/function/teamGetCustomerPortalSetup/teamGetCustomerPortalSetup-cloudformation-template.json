@@ -77,6 +77,7 @@
             "REGION": {
               "Ref": "AWS::Region"
             },
+            "CUSTOMER_PORTAL_ENABLED": "false",
             "CUSTOMERS_TABLE_NAME": {
               "Fn::ImportValue": {
                 "Fn::Sub": "${apiteamGraphQLAPIIdOutput}:GetAtt:CustomersTable:Name"

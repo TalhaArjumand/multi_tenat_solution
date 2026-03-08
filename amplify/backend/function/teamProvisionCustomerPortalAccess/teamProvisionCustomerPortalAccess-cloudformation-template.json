@@ -94,6 +94,7 @@
             "AUTH_TEAM06DBB7FC_USERPOOLID": {
               "Ref": "authteam06dbb7fcUserPoolId"
             },
+            "CUSTOMER_PORTAL_ENABLED": "false",
             "PORTAL_URL": "https://main.d13k6ou0ossrku.amplifyapp.com",
             "SENDER_EMAIL": "info@sfproject.com.pk",
             "PORTAL_INVITE_EXPIRY_HOURS": "24"

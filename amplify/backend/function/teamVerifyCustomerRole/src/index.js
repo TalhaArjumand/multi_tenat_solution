@@ -17,6 +17,7 @@ const { Sha256 } = crypto;
 const REGION = process.env.REGION;
 const GRAPHQL_ENDPOINT = process.env.API_TEAM_GRAPHQLAPIENDPOINTOUTPUT;
 const PROVISION_CUSTOMER_PORTAL_FUNCTION = process.env.FUNCTION_TEAMPROVISIONCUSTOMERPORTALACCESS_NAME;
+const CUSTOMER_PORTAL_ENABLED = process.env.CUSTOMER_PORTAL_ENABLED === 'true';
 
 const stsClient = new STSClient({ region: REGION });
 const lambdaClient = new LambdaClient({ region: REGION });
@@ -156,7 +157,9 @@ export const handler = async (event) => {
       
       await graphqlRequest(updateCustomerMutation, { input: updateInput });
 
-      if (PROVISION_CUSTOMER_PORTAL_FUNCTION) {
+      if (!CUSTOMER_PORTAL_ENABLED) {
+        console.log(`CUSTOMER_PORTAL_DISABLED_PHASE1_SKIP customerId=${customerId}`);
+      } else if (PROVISION_CUSTOMER_PORTAL_FUNCTION) {
         try {
           await lambdaClient.send(new InvokeCommand({
             FunctionName: PROVISION_CUSTOMER_PORTAL_FUNCTION,

@@ -11,6 +11,7 @@ const REGION = process.env.REGION;
 const CUSTOMERS_TABLE_NAME = process.env.CUSTOMERS_TABLE_NAME;
 const USER_POOL_ID = process.env.AUTH_TEAM06DBB7FC_USERPOOLID;
 const INVITE_TOKEN_INDEX_NAME = 'byPortalInviteTokenHash';
+const CUSTOMER_PORTAL_ENABLED = process.env.CUSTOMER_PORTAL_ENABLED === 'true';
 
 const dynamoClient = new DynamoDBClient({ region: REGION });
 const cognitoClient = new CognitoIdentityProviderClient({ region: REGION });
@@ -125,6 +126,15 @@ export const handler = async (event) => {
   const parsedBody = event.body ? (typeof event.body === 'string' ? JSON.parse(event.body) : event.body) : null;
   const inviteToken = event.arguments?.inviteToken || event.inviteToken || parsedBody?.inviteToken || null;
   const password = event.arguments?.password || event.password || parsedBody?.password || null;
+
+  if (!CUSTOMER_PORTAL_ENABLED) {
+    structuredLog('CUSTOMER_PORTAL_SETUP_CONSUME_FAILED', { errorCode: 'PORTAL_DISABLED_PHASE1' });
+    return buildResponse(event, {
+      success: false,
+      errorCode: 'PORTAL_DISABLED_PHASE1',
+      error: 'Customer portal is disabled in Phase 1'
+    }, 403);
+  }
 
   if (!CUSTOMERS_TABLE_NAME || !USER_POOL_ID) {
     structuredLog('CUSTOMER_PORTAL_SETUP_CONSUME_FAILED', { errorCode: 'SETUP_CONFIGURATION_MISSING' });

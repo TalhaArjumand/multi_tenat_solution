@@ -32,6 +32,7 @@ const PORTAL_URL = process.env.PORTAL_URL || 'https://main.d13k6ou0ossrku.amplif
 const SENDER_EMAIL = process.env.SENDER_EMAIL || 'info@sfproject.com.pk';
 const PORTAL_INVITE_EXPIRY_HOURS = parseInt(process.env.PORTAL_INVITE_EXPIRY_HOURS || '24', 10);
 const PORTAL_PROVISIONING_VERSION = 'v1';
+const CUSTOMER_PORTAL_ENABLED = process.env.CUSTOMER_PORTAL_ENABLED === 'true';
 
 const sesClient = new SESClient({ region: REGION });
 const cognitoClient = new CognitoIdentityProviderClient({ region: REGION });
@@ -328,6 +329,16 @@ export const handler = async (event) => {
   const customerId = args.customerId;
 
   structuredLog('CUSTOMER_PORTAL_PROVISION_STARTED', { customerId });
+
+  if (!CUSTOMER_PORTAL_ENABLED) {
+    structuredLog('CUSTOMER_PORTAL_DISABLED_PHASE1', { customerId });
+    return {
+      success: false,
+      customerId,
+      errorCode: 'PORTAL_DISABLED_PHASE1',
+      error: 'Customer portal is disabled in Phase 1'
+    };
+  }
 
   if (!customerId) {
     return { success: false, error: 'Missing required field: customerId' };
