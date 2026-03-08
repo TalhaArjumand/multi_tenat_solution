@@ -488,6 +488,20 @@
       "providerPlugin": "awscloudformation",
       "service": "Lambda"
     },
+    "teamUnsubscribeCustomerNotifications": {
+      "build": true,
+      "dependsOn": [
+        {
+          "attributes": [
+            "GraphQLAPIIdOutput"
+          ],
+          "category": "api",
+          "resourceName": "team"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
     "teamSendCustomerInvitation": {
       "build": true,
       "dependsOn": [
@@ -955,6 +969,22 @@
         {
           "category": "function",
           "resourceName": "teamCompleteCustomerPortalSetup"
+        }
+      ]
+    },
+    "AMPLIFY_function_teamUnsubscribeCustomerNotifications_deploymentBucketName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "teamUnsubscribeCustomerNotifications"
+        }
+      ]
+    },
+    "AMPLIFY_function_teamUnsubscribeCustomerNotifications_s3Key": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "teamUnsubscribeCustomerNotifications"
         }
       ]
     },

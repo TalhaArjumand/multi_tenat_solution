@@ -205,6 +205,8 @@ type Customers
   adminName: String
   notificationEmail: String
   notificationsEnabled: Boolean
+  notificationUnsubscribeTokenHash: String
+  notificationUnsubscribedAt: AWSDateTime
   status: String
   settings: AWSJSON
   createdAt: AWSDateTime
@@ -366,6 +368,11 @@ type Mutation {
   @auth(rules: [{ allow: private, provider: iam} { allow: private }])
   publishPermissions(result: PermissionInput): Permission
   @auth(rules: [{ allow: private, provider: iam} { allow: private }])
+  unsubscribeCustomerNotifications(
+    unsubscribeToken: String!
+  ): CustomerNotificationUnsubscribeResult
+  @function(name: "teamUnsubscribeCustomerNotifications-${env}")
+  @auth(rules: [{ allow: public, provider: iam }])
   completeCustomerPortalSetup(
     inviteToken: String!
     password: String!
@@ -457,6 +464,18 @@ type CustomerPortalSetupResult @aws_iam @aws_cognito_user_pools {
   portalUserEmail: String
   portalInviteStatus: String
   portalInviteConsumedAt: String
+  error: String
+  errorCode: String
+}
+
+type CustomerNotificationUnsubscribeResult @aws_iam @aws_cognito_user_pools {
+  success: Boolean
+  customerId: String
+  customerName: String
+  notificationEmail: String
+  notificationsEnabled: Boolean
+  notificationUnsubscribedAt: AWSDateTime
+  alreadyUnsubscribed: Boolean
   error: String
   errorCode: String
 }

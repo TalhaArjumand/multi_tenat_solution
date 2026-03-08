@@ -12,6 +12,7 @@ import CustomerApprovalPage from "./components/CustomerApproval/CustomerApproval
 import CustomerDashboard from "./components/CustomerPortal/CustomerDashboard";
 import CustomerError from "./components/CustomerPortal/CustomerError";
 import CustomerPortalPaused from "./components/CustomerPortal/CustomerPortalPaused";
+import NotificationUnsubscribePage from "./components/Notifications/NotificationUnsubscribePage";
 import { CUSTOMER_PORTAL_ENABLED } from "./config/features";
 import logo from "./media/logo-transparent.png";
 import "./index.css";
@@ -142,6 +143,7 @@ function App() {
     <BrowserRouter>
       <Switch>
         <Route path="/customer-approval" exact component={CustomerApprovalPage} />
+        <Route path="/notifications/unsubscribe" exact component={NotificationUnsubscribePage} />
         <Route path="*">
           <div>
             {!CUSTOMER_PORTAL_ENABLED && isCustomerRoute ? (

@@ -1,7 +1,12 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "{\"createdOn\":\"Linux\",\"createdBy\":\"Amplify\",\"createdWith\":\"9.2.1\",\"stackType\":\"function-Lambda\",\"metadata\":{}}",
+  "Description": "Lambda Function resource stack creation using Amplify CLI",
   "Parameters": {
+    "CloudWatchRule": {
+      "Type": "String",
+      "Default": "NONE",
+      "Description": " Schedule Expression"
+    },
     "deploymentBucketName": {
       "Type": "String"
     },
@@ -45,16 +50,16 @@
             "Ref": "s3Key"
           }
         },
-        "Handler": "index.lambda_handler",
+        "Handler": "index.handler",
         "FunctionName": {
           "Fn::If": [
             "ShouldNotCreateEnvResources",
-            "teamNotifications",
+            "teamUnsubscribeCustomerNotifications",
             {
               "Fn::Join": [
                 "",
                 [
-                  "teamNotifications",
+                  "teamUnsubscribeCustomerNotifications",
                   "-",
                   {
                     "Ref": "env"
@@ -72,13 +77,11 @@
             "REGION": {
               "Ref": "AWS::Region"
             },
-            "SETTINGS_TABLE_NAME": {
+            "CUSTOMERS_TABLE_NAME": {
               "Fn::ImportValue": {
-                "Fn::Sub": "${apiteamGraphQLAPIIdOutput}:GetAtt:SettingsTable:Name"
+                "Fn::Sub": "${apiteamGraphQLAPIIdOutput}:GetAtt:CustomersTable:Name"
               }
-            },
-            "CUSTOMERS_TABLE_NAME": "Customers-aulamfydfvg5fmjl4uboxne7du-main",
-            "CUSTOMER_NOTIFICATION_BASE_URL": "https://main.d13k6ou0ossrku.amplifyapp.com"
+            }
           }
         },
         "Role": {
@@ -87,9 +90,9 @@
             "Arn"
           ]
         },
-        "Runtime": "python3.10",
+        "Runtime": "nodejs22.x",
         "Layers": [],
-        "Timeout": 120
+        "Timeout": 25
       }
     },
     "LambdaExecutionRole": {
@@ -98,12 +101,12 @@
         "RoleName": {
           "Fn::If": [
             "ShouldNotCreateEnvResources",
-            "teamLambdaRoledab1354c",
+            "teamLambdaRoleUnsubCustNotif",
             {
               "Fn::Join": [
                 "",
                 [
-                  "teamLambdaRoledab1354c",
+                  "teamLambdaRoleUnsubCustNotif",
                   "-",
                   {
                     "Ref": "env"
@@ -155,7 +158,7 @@
               ],
               "Resource": {
                 "Fn::Sub": [
-                  "arn:${AWS::Partition}:logs:${region}:${account}:log-group:/aws/lambda/${lambda}:log-stream:*",
+                  "arn:aws:logs:${region}:${account}:log-group:/aws/lambda/${lambda}:log-stream:*",
                   {
                     "region": {
                       "Ref": "AWS::Region"
@@ -169,48 +172,45 @@
                   }
                 ]
               }
-            },
+            }
+          ]
+        }
+      }
+    },
+    "CustomerNotificationUnsubscribePolicy": {
+      "DependsOn": [
+        "LambdaExecutionRole"
+      ],
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyName": "customer-notification-unsubscribe-access",
+        "Roles": [
+          {
+            "Ref": "LambdaExecutionRole"
+          }
+        ],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
             {
               "Effect": "Allow",
               "Action": [
-                "dynamodb:GetItem"
+                "dynamodb:Scan"
               ],
               "Resource": [
                 {
-                  "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Settings-*"
+                  "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Customers-*"
                 }
               ]
             },
             {
               "Effect": "Allow",
               "Action": [
-                "ses:SendEmail"
-              ],
-              "Resource": "*"
-            },
-            {
-              "Effect": "Allow",
-              "Action": [
-                "sns:Publish"
-              ],
-              "Resource": {
-                "Fn::ImportValue": "NotificationTopicArn"
-              }
-            },
-            {
-              "Effect": "Allow",
-              "Action": [
-                "dynamodb:Scan",
-                "dynamodb:GetItem",
-                "dynamodb:Query",
                 "dynamodb:UpdateItem"
               ],
               "Resource": [
                 {
                   "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Customers-*"
-                },
-                {
-                  "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Customers-*/index/*"
                 }
               ]
             }
@@ -236,19 +236,6 @@
     "Region": {
       "Value": {
         "Ref": "AWS::Region"
-      }
-    },
-    "LambdaExecutionRole": {
-      "Value": {
-        "Ref": "LambdaExecutionRole"
-      }
-    },
-    "LambdaExecutionRoleArn": {
-      "Value": {
-        "Fn::GetAtt": [
-          "LambdaExecutionRole",
-          "Arn"
-        ]
       }
     }
   }

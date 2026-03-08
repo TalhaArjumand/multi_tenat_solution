@@ -5,6 +5,8 @@
 from slack_sdk import WebClient
 import os
 import json
+import hashlib
+import secrets
 import boto3
 from datetime import datetime, timezone
 from dateutil import parser, tz
@@ -41,7 +43,7 @@ def send_ses_notification(
             ses_region = parse_arn(source_arn)["region"]
             ses_client = session.client("ses", region_name=ses_region)
 
-            ses_client.send_email(
+            return ses_client.send_email(
                 Source=source_email,
                 SourceArn=source_arn,
                 Destination={"ToAddresses": to_addresses, "CcAddresses": cc_addresses},
@@ -52,7 +54,7 @@ def send_ses_notification(
             )
         else:
             ses_client = session.client("ses")
-            ses_client.send_email(
+            return ses_client.send_email(
                 Source=source_email,
                 Destination={"ToAddresses": to_addresses, "CcAddresses": cc_addresses},
                 Message={
@@ -62,6 +64,7 @@ def send_ses_notification(
             )
     except Exception as e:
         print(f"Error sending email via SES: {e}")
+        return None
 
 
 def send_sns_notification(notification_topic_arn, message, subject):
@@ -236,7 +239,26 @@ def send_slack_notifications(
             )
 
 
-def build_customer_notification_email(event, login_url):
+def hash_token(token):
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def generate_unsubscribe_token():
+    return secrets.token_urlsafe(32)
+
+
+def store_customer_unsubscribe_token(cust_table, customer_id, token_hash):
+    cust_table.update_item(
+        Key={"id": customer_id},
+        UpdateExpression=(
+            "SET notificationUnsubscribeTokenHash = :tokenHash "
+            "REMOVE notificationUnsubscribedAt"
+        ),
+        ExpressionAttributeValues={":tokenHash": token_hash},
+    )
+
+
+def build_customer_notification_email(event, login_url, unsubscribe_url):
     """Build an informational email for the customer admin when their account is accessed."""
     requester = event.get("email", "Unknown")
     account = f'{event["accountName"]} ({event["accountId"]})'
@@ -259,6 +281,7 @@ def build_customer_notification_email(event, login_url):
 <tr style="background-color: #f2f3f3;"><td style="padding: 8px; border: 1px solid #d5dbdb;"><b>Ticket Number</b></td><td style="padding: 8px; border: 1px solid #d5dbdb;">{ticket}</td></tr>
 </table>
 <p style="margin-top: 20px; color: #545b64;">This access was pre-approved during your onboarding process. If you have concerns, please contact your CloudiQS MSP administrator.</p>
+<p style="margin-top: 20px; color: #545b64;">If you no longer want these notifications, you can <a href="{unsubscribe_url}">unsubscribe here</a>.</p>
 </body></html>"""
     return html
 
@@ -302,12 +325,24 @@ def send_customer_notification(event, ses_source_email, ses_source_arn):
             print(f"CUSTOMER_NOTIFICATION_SKIPPED reason=MISSING_NOTIFICATION_EMAIL customerId={customer_id}")
             return
 
+        unsubscribe_token = generate_unsubscribe_token()
+        unsubscribe_token_hash = hash_token(unsubscribe_token)
+        store_customer_unsubscribe_token(cust_table, customer_id, unsubscribe_token_hash)
+
+        notification_base_url = os.getenv(
+            "CUSTOMER_NOTIFICATION_BASE_URL",
+            "https://main.d13k6ou0ossrku.amplifyapp.com",
+        ).rstrip("/")
+        unsubscribe_url = (
+            f"{notification_base_url}/notifications/unsubscribe?token={unsubscribe_token}"
+        )
+
         login_url = event.get("sso_login_url", "")
-        html = build_customer_notification_email(event, login_url)
+        html = build_customer_notification_email(event, login_url, unsubscribe_url)
         account = f'{event["accountName"]} ({event["accountId"]})'
         subject = f"CloudiQS MSP - Access notification for {account}"
 
-        send_ses_notification(
+        send_result = send_ses_notification(
             source_email=ses_source_email,
             source_arn=ses_source_arn,
             message_html=html,
@@ -315,9 +350,14 @@ def send_customer_notification(event, ses_source_email, ses_source_arn):
             to_addresses=[recipient_email],
             cc_addresses=[]
         )
-        print(
-            f"CUSTOMER_NOTIFICATION_SENT customerId={customer_id} recipientEmail={recipient_email} status={event.get('status')}"
-        )
+        if send_result:
+            print(
+                f"CUSTOMER_NOTIFICATION_SENT customerId={customer_id} recipientEmail={recipient_email} status={event.get('status')} messageId={send_result.get('MessageId')}"
+            )
+        else:
+            print(
+                f"CUSTOMER_NOTIFICATION_FAILED customerId={customer_id} error=SES_SEND_FAILED"
+            )
     except Exception as e:
         print(f"CUSTOMER_NOTIFICATION_FAILED customerId={event.get('customerId')} error={e}")
 
