@@ -8,10 +8,22 @@ import json
 import hashlib
 import secrets
 import boto3
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from html import escape
 from dateutil import parser, tz
 
 session = boto3.Session()
+
+ROLE_NAME_MAP = {
+    "ReadOnlyAccess": "CloudIQS-MSP-ReadOnlyRole",
+    "S3FullAccess": "CloudIQS-MSP-S3AdminRole",
+    "EC2FullAccess": "CloudIQS-MSP-EC2AdminRole",
+    "PowerUserAccess": "CloudIQS-MSP-PowerUserRole",
+    "AdministratorAccess": "CloudIQS-MSP-AdminRole",
+    "DatabaseAdmin": "CloudIQS-MSP-DatabaseAdminRole",
+    "NetworkAdmin": "CloudIQS-MSP-NetworkAdminRole",
+    "SecurityAudit": "CloudIQS-MSP-SecurityAuditRole",
+}
 
 
 def parse_arn(arn):
@@ -258,15 +270,71 @@ def store_customer_unsubscribe_token(cust_table, customer_id, token_hash):
     )
 
 
+def get_multi_tenant_role_arn(account_id, role_name):
+    iam_role_name = ROLE_NAME_MAP.get(role_name)
+    if not account_id or not iam_role_name:
+        return None
+    return f"arn:aws:iam::{account_id}:role/{iam_role_name}"
+
+
+def build_cloudtrail_evidence_helper(event):
+    account_id = str(event.get("accountId", "Unknown"))
+    role_name = event.get("role", "Unknown")
+    role_arn = get_multi_tenant_role_arn(account_id, role_name)
+    start_time_raw = event.get("startTime")
+    event_name = "AssumeRole"
+    utc_window = "Use a 30-minute window around the access start time."
+    if start_time_raw:
+        try:
+            parsed_start = parser.parse(start_time_raw).astimezone(timezone.utc)
+            window_start = (parsed_start - timedelta(minutes=15)).strftime(
+                "%Y-%m-%d %H:%M UTC"
+            )
+            window_end = (parsed_start + timedelta(minutes=15)).strftime(
+                "%Y-%m-%d %H:%M UTC"
+            )
+            utc_window = f"{window_start} to {window_end}"
+        except Exception:
+            utc_window = "Use a 30-minute window around the access start time."
+
+    role_value = role_arn or role_name
+    region_note = (
+        "Start in us-east-1 for AWS STS global endpoint events. If your account "
+        "uses regional STS endpoints, also check the Region where the STS call "
+        "was made."
+    )
+
+    html = f"""
+<h3 style="color: #232f3e; margin-top: 28px;">Verify in your CloudTrail</h3>
+<p style="margin-top: 8px; color: #545b64;">Use your AWS account CloudTrail Event history to confirm this access. CloudTrail can take a few minutes to appear.</p>
+<table style="border-collapse: collapse; width: 100%; max-width: 600px;">
+<tr style="background-color: #f2f3f3;"><td style="padding: 8px; border: 1px solid #d5dbdb;"><b>Event name</b></td><td style="padding: 8px; border: 1px solid #d5dbdb;">{escape(event_name)}</td></tr>
+<tr><td style="padding: 8px; border: 1px solid #d5dbdb;"><b>UTC time window</b></td><td style="padding: 8px; border: 1px solid #d5dbdb;">{escape(utc_window)}</td></tr>
+<tr style="background-color: #f2f3f3;"><td style="padding: 8px; border: 1px solid #d5dbdb;"><b>Account ID</b></td><td style="padding: 8px; border: 1px solid #d5dbdb;">{escape(account_id)}</td></tr>
+<tr><td style="padding: 8px; border: 1px solid #d5dbdb;"><b>Role ARN</b></td><td style="padding: 8px; border: 1px solid #d5dbdb;">{escape(role_value)}</td></tr>
+<tr style="background-color: #f2f3f3;"><td style="padding: 8px; border: 1px solid #d5dbdb;"><b>Region note</b></td><td style="padding: 8px; border: 1px solid #d5dbdb;">{escape(region_note)}</td></tr>
+</table>
+<p style="margin-top: 16px; color: #545b64;">To stop future access immediately, disable or delete the CloudiQS cross-account role in your AWS account.</p>
+"""
+
+    return {
+        "html": html,
+        "event_name": event_name,
+        "utc_window": utc_window,
+        "role_arn": role_value,
+    }
+
+
 def build_customer_notification_email(event, login_url, unsubscribe_url):
     """Build an informational email for the customer admin when their account is accessed."""
-    requester = event.get("email", "Unknown")
-    account = f'{event["accountName"]} ({event["accountId"]})'
-    role = event.get("role", "Unknown")
-    duration_hours = event.get("time", "Unknown")
-    justification = event.get("justification", "No justification provided")
-    ticket = event.get("ticketNo", "No ticket provided")
-    request_start_time = event.get("startTime", "Unknown")
+    requester = escape(event.get("email", "Unknown"))
+    account = escape(f'{event["accountName"]} ({event["accountId"]})')
+    role = escape(event.get("role", "Unknown"))
+    duration_hours = escape(str(event.get("time", "Unknown")))
+    justification = escape(event.get("justification", "No justification provided"))
+    ticket = escape(event.get("ticketNo", "No ticket provided"))
+    request_start_time = escape(str(event.get("startTime", "Unknown")))
+    evidence_helper = build_cloudtrail_evidence_helper(event)
 
     html = f"""<html><body>
 <h2 style="color: #232f3e;">CloudiQS MSP - Account Access Notification</h2>
@@ -280,10 +348,11 @@ def build_customer_notification_email(event, login_url, unsubscribe_url):
 <tr><td style="padding: 8px; border: 1px solid #d5dbdb;"><b>Justification</b></td><td style="padding: 8px; border: 1px solid #d5dbdb;">{justification}</td></tr>
 <tr style="background-color: #f2f3f3;"><td style="padding: 8px; border: 1px solid #d5dbdb;"><b>Ticket Number</b></td><td style="padding: 8px; border: 1px solid #d5dbdb;">{ticket}</td></tr>
 </table>
+{evidence_helper["html"]}
 <p style="margin-top: 20px; color: #545b64;">This access was pre-approved during your onboarding process. If you have concerns, please contact your CloudiQS MSP administrator.</p>
 <p style="margin-top: 20px; color: #545b64;">If you no longer want these notifications, you can <a href="{unsubscribe_url}">unsubscribe here</a>.</p>
 </body></html>"""
-    return html
+    return html, evidence_helper
 
 
 def send_customer_notification(event, ses_source_email, ses_source_arn):
@@ -338,7 +407,16 @@ def send_customer_notification(event, ses_source_email, ses_source_arn):
         )
 
         login_url = event.get("sso_login_url", "")
-        html = build_customer_notification_email(event, login_url, unsubscribe_url)
+        html, evidence_helper = build_customer_notification_email(
+            event, login_url, unsubscribe_url
+        )
+        print(
+            "CUSTOMER_EVIDENCE_HELPER_INCLUDED=true "
+            f"customerId={customer_id} accountId={event.get('accountId')} "
+            f"eventName={evidence_helper['event_name']} "
+            f"utcWindow={evidence_helper['utc_window']} "
+            f"roleArn={evidence_helper['role_arn']}"
+        )
         account = f'{event["accountName"]} ({event["accountId"]})'
         subject = f"CloudiQS MSP - Access notification for {account}"
 
