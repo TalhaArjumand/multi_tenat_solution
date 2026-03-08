@@ -47,7 +47,7 @@ Customer can always revoke future access by disabling or deleting the cross-acco
 - notification destination is customer-controlled
 - customer can unsubscribe or change preferences explicitly
 - unsubscribe is one-click and logged
-- default subscription behavior must be defined per customer and documented
+- v1 default: notifications remain disabled until a notification email is configured and notifications are explicitly enabled for that customer
 
 ### I4a — v1 recipient model
 Phase 1 uses one customer-managed distribution email per customer as the notification target.

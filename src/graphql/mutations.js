@@ -470,6 +470,8 @@ export const createCustomers = /* GraphQL */ `
       approverGroupIds
       adminEmail
       adminName
+      notificationEmail
+      notificationsEnabled
       status
       settings
       createdAt
@@ -504,6 +506,8 @@ export const updateCustomers = /* GraphQL */ `
       approverGroupIds
       adminEmail
       adminName
+      notificationEmail
+      notificationsEnabled
       status
       settings
       createdAt
@@ -538,6 +542,8 @@ export const deleteCustomers = /* GraphQL */ `
       approverGroupIds
       adminEmail
       adminName
+      notificationEmail
+      notificationsEnabled
       status
       settings
       createdAt

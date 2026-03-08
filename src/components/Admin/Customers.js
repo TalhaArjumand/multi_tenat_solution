@@ -23,7 +23,8 @@ import {
   Textarea,
   StatusIndicator,
   Alert,
-  TokenGroup
+  TokenGroup,
+  Checkbox
 } from "@awsui/components-react";
 import { useCollection } from "@awsui/collection-hooks";
 import { API, graphqlOperation } from "aws-amplify";
@@ -144,6 +145,8 @@ function Customers(props) {
   const [customerDescription, setCustomerDescription] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminName, setAdminName] = useState("");
+  const [notificationEmail, setNotificationEmail] = useState("");
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [status, setStatus] = useState({ label: "Active", value: "active" });
   const [selectedAccounts, setSelectedAccounts] = useState([]);
   const [accountIdInput, setAccountIdInput] = useState("");
@@ -158,6 +161,7 @@ function Customers(props) {
   // Form validation
   const [nameError, setNameError] = useState("");
   const [emailError, setEmailError] = useState("");
+  const [notificationEmailError, setNotificationEmailError] = useState("");
   
   // Role verification
   const [verifyModalVisible, setVerifyModalVisible] = useState(false);
@@ -280,6 +284,8 @@ function Customers(props) {
       setCustomerDescription(customer.description || "");
       setAdminEmail(customer.adminEmail || "");
       setAdminName(customer.adminName || "");
+      setNotificationEmail(customer.notificationEmail || "");
+      setNotificationsEnabled(Boolean(customer.notificationsEnabled));
       setStatus({
         label: customer.status === 'active' ? 'Active' : 'Inactive',
         value: customer.status || 'active'
@@ -317,6 +323,8 @@ function Customers(props) {
     setCustomerDescription("");
     setAdminEmail("");
     setAdminName("");
+    setNotificationEmail("");
+    setNotificationsEnabled(false);
     setStatus({ label: "Active", value: "active" });
     setPermissionSet({ label: "Read-Only", value: "read-only" });
     setSelectedAccounts([]);
@@ -325,6 +333,7 @@ function Customers(props) {
     setSelectedApproverGroups([]);
     setNameError("");
     setEmailError("");
+    setNotificationEmailError("");
   };
 
   const validateForm = () => {
@@ -342,6 +351,16 @@ function Customers(props) {
       isValid = false;
     } else {
       setEmailError("");
+    }
+
+    if (notificationEmail && !notificationEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+      setNotificationEmailError("Please enter a valid notification email address");
+      isValid = false;
+    } else if (notificationsEnabled && !notificationEmail.trim()) {
+      setNotificationEmailError("Notification email is required when customer notifications are enabled");
+      isValid = false;
+    } else {
+      setNotificationEmailError("");
     }
     
     return isValid;
@@ -368,6 +387,8 @@ function Customers(props) {
         description: customerDescription,
         adminEmail: adminEmail,
         adminName: adminName,
+        notificationEmail: notificationEmail || null,
+        notificationsEnabled,
         status: status.value,
         accountIds: selectedAccounts.map(acc => acc.label),
         approverGroupIds: selectedApproverGroups.map(grp => grp.value),
@@ -462,6 +483,8 @@ function Customers(props) {
         description: customerDescription,
         adminEmail: adminEmail,
         adminName: adminName,
+        notificationEmail: notificationEmail || null,
+        notificationsEnabled,
         status: status.value,
         accountIds: selectedAccounts.map(acc => acc.label),
         approverGroupIds: selectedApproverGroups.map(grp => grp.value),
@@ -809,6 +832,35 @@ function Customers(props) {
               </FormField>
             </ColumnLayout>
 
+            <ColumnLayout columns={2}>
+              <FormField
+                label="Notification email"
+                errorText={notificationEmailError}
+                stretch
+                constraintText="Optional. Customer-managed group email for CloudiQS notifications."
+              >
+                <Input
+                  value={notificationEmail}
+                  onChange={({ detail }) => setNotificationEmail(detail.value)}
+                  placeholder="e.g., security-team@acme.com"
+                  type="email"
+                />
+              </FormField>
+
+              <FormField
+                label="Customer notifications"
+                stretch
+                description="Enable CloudiQS customer notification emails for this customer."
+              >
+                <Checkbox
+                  checked={notificationsEnabled}
+                  onChange={({ detail }) => setNotificationsEnabled(detail.checked)}
+                >
+                  Enable customer notifications
+                </Checkbox>
+              </FormField>
+            </ColumnLayout>
+
             <FormField
               label="Status"
               stretch
@@ -977,6 +1029,35 @@ function Customers(props) {
                   placeholder="e.g., admin@acme.com"
                   type="email"
                 />
+              </FormField>
+            </ColumnLayout>
+
+            <ColumnLayout columns={2}>
+              <FormField
+                label="Notification email"
+                errorText={notificationEmailError}
+                stretch
+                constraintText="Optional. Customer-managed group email for CloudiQS notifications."
+              >
+                <Input
+                  value={notificationEmail}
+                  onChange={({ detail }) => setNotificationEmail(detail.value)}
+                  placeholder="e.g., security-team@acme.com"
+                  type="email"
+                />
+              </FormField>
+
+              <FormField
+                label="Customer notifications"
+                stretch
+                description="Enable CloudiQS customer notification emails for this customer."
+              >
+                <Checkbox
+                  checked={notificationsEnabled}
+                  onChange={({ detail }) => setNotificationsEnabled(detail.checked)}
+                >
+                  Enable customer notifications
+                </Checkbox>
               </FormField>
             </ColumnLayout>
 

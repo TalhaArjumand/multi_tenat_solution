@@ -582,6 +582,8 @@ export const getCustomers = /* GraphQL */ `
       approverGroupIds
       adminEmail
       adminName
+      notificationEmail
+      notificationsEnabled
       status
       settings
       createdAt
@@ -618,6 +620,8 @@ export const listCustomers = /* GraphQL */ `
         approverGroupIds
         adminEmail
         adminName
+        notificationEmail
+        notificationsEnabled
         status
         settings
         createdAt

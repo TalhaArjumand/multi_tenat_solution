@@ -203,6 +203,8 @@ type Customers
   approverGroupIds: [String]
   adminEmail: String
   adminName: String
+  notificationEmail: String
+  notificationsEnabled: Boolean
   status: String
   settings: AWSJSON
   createdAt: AWSDateTime
